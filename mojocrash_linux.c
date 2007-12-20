@@ -1,9 +1,12 @@
 #ifdef __linux__
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /* this all relies on Linux/ELF/glibc specific APIs. */
 #define _GNU_SOURCE
@@ -116,6 +119,7 @@ void MOJOCRASH_platform_die(int force)
 
 int MOJOCRASH_platform_start_crashlog(void)
 {
+    const char *MOJOCRASH_appname = "MyAppName";  /* !!! FIXME: change this. */
     char *path1 = logpath + strlen(logpath);
     char *path2 = path1 + strlen(MOJOCRASH_appname);
     int num = 0;
@@ -126,13 +130,13 @@ int MOJOCRASH_platform_start_crashlog(void)
      *  close it (ignore failure) and start again. If the file was really
      *  there, it was useless in the double-fault anyhow.
      */
-    if (crashlog != -1)
+    if (crashlogfd != -1)
     {
-        close(crashlog);
-        crashlog = -1;
+        close(crashlogfd);
+        crashlogfd = -1;
     } /* if */
 
-    while (crashlog == -1)
+    while (crashlogfd == -1)
     {
         /*
          * Dir won't exist before first crash, and the reporter app may
@@ -153,22 +157,22 @@ int MOJOCRASH_platform_start_crashlog(void)
 } /* MOJOCRASH_platform_start_crashlog */
 
 
-int MOJOCRASH_new_crashlog_line(const char *str)
+int MOJOCRASH_platform_new_crashlog_line(const char *str)
 {
     const int len = strlen(str);
-    if (write(crashfd, str, len) != len)
+    if (write(crashlogfd, str, len) != len)
         return 0;
-    if (write(crashfd, "\n", 1) != 1)
+    if (write(crashlogfd, "\n", 1) != 1)
         return 0;
     return 1;
-} /* MOJOCRASH_new_crashlog_line */
+} /* MOJOCRASH_platform_new_crashlog_line */
 
 
 int MOJOCRASH_platform_end_crashlog(void)
 {
-    if (close(crashlog) == -1)
+    if (close(crashlogfd) == -1)
         return 0;
-    crashlog = -1;
+    crashlogfd = -1;
     return 1;
 } /* MOJOCRASH_platform_end_crashlog */
 
