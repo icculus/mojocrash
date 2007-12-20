@@ -11,15 +11,31 @@
 #ifndef _INCLUDE_MOJOCRASH_INTERNAL_H_
 #define _INCLUDE_MOJOCRASH_INTERNAL_H_
 
+#if !__MOJOCRASH_INTERNAL__
+#error Please do not include this file from your program.
+#endif
+
+/* This is mostly so NULL is defined. */
+#include <stdio.h>
+
+#include "mojocrash.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "mojocrash.h"
-
-#if !__MOJOCRASH_INTERNAL__
-#error Please do not include this file from your program.
+/* Reimplementations to avoid dependency on C runtime... */
+#ifdef strlen
+#undef strlen
 #endif
+#define strlen(x) MOJOCRASH_StringLength(x)
+int MOJOCRASH_StringLength(const char *str);
+
+#ifdef strcpy
+#undef strcpy
+#endif
+#define strcpy(x,y) MOJOCRASH_StringCopy(x,y)
+void MOJOCRASH_StringCopy(char *dst, const char *str);
 
 /*
  * These are all functions that are platform-specific. Usually they need
@@ -27,9 +43,13 @@ extern "C" {
  */
 
 int MOJOCRASH_platform_init(void);
-int MOJOCRASH_platform_install_crash_catcher(void (*catcher)(int sig));
+int MOJOCRASH_platform_install_crash_catcher(MOJOCRASH_catcher catcher);
 int MOJOCRASH_platform_get_callstack(MOJOCRASH_get_callstack_callback cb);
 int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb);
+int MOJOCRASH_platform_start_crashlog(void);
+int MOJOCRASH_platform_new_crashlog_line(const char *str);
+int MOJOCRASH_platform_end_crashlog(void);
+void MOJOCRASH_platform_die(int force);
 
 #ifdef __cplusplus
 }

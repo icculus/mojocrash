@@ -17,8 +17,9 @@
 /* We're memory-hungry here, in hopes of avoiding malloc() during a crash. */
 #define MAX_CALLSTACKS 1024
 static void *callstack[MAX_CALLSTACKS];
+static char logpath[PATH_MAX+1];
 static char exename[PATH_MAX+1];
-
+static int crashlogfd = -1;
 
 #define STATICARRAYLEN(x) (sizeof (x) / sizeof ((x)[0]))
 
@@ -104,15 +105,91 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
 } /* MOJOCRASH_platform_get_objects */
 
 
+void MOJOCRASH_platform_die(int force)
+{
+    if (force)
+        _exit(86);
+    else
+        exit(86);
+} /* MOJOCRASH_platform_die */
+
+
+int MOJOCRASH_platform_start_crashlog(void)
+{
+    char *path1 = logpath + strlen(logpath);
+    char *path2 = path1 + strlen(MOJOCRASH_appname);
+    int num = 0;
+
+    /*
+     * if crashlog isn't -1, we might be in a double-fault, but it might be
+     *  that the crashing program wrote over the static variable, too...
+     *  close it (ignore failure) and start again. If the file was really
+     *  there, it was useless in the double-fault anyhow.
+     */
+    if (crashlog != -1)
+    {
+        close(crashlog);
+        crashlog = -1;
+    } /* if */
+
+    while (crashlog == -1)
+    {
+        /*
+         * Dir won't exist before first crash, and the reporter app may
+         *  remove the storage dir at any time as it cleans up after emptying
+         *  out old reports, so try to (re)create it on each iteration.
+         */
+        *path1 = *path2 = '\0';
+        mkdir(logpath, 0700);
+        *path1 = '/';
+        mkdir(logpath, 0700);
+        *path2 = '/';
+        snprintf(path2 + 1, sizeof (logpath) - (path2-logpath), "%d", num);
+        crashlogfd = open(logpath, O_WRONLY | O_CREAT | O_EXCL, 0600);
+        num++;
+    } /* while */
+
+    return 1;
+} /* MOJOCRASH_platform_start_crashlog */
+
+
+int MOJOCRASH_new_crashlog_line(const char *str)
+{
+    const int len = strlen(str);
+    if (write(crashfd, str, len) != len)
+        return 0;
+    if (write(crashfd, "\n", 1) != 1)
+        return 0;
+    return 1;
+} /* MOJOCRASH_new_crashlog_line */
+
+
+int MOJOCRASH_platform_end_crashlog(void)
+{
+    if (close(crashlog) == -1)
+        return 0;
+    crashlog = -1;
+    return 1;
+} /* MOJOCRASH_platform_end_crashlog */
+
+
 int MOJOCRASH_platform_init(void)
 {
+    const char *homedir = getenv("HOME");
+    int len = 0;
     ssize_t rc = readlink("/proc/self/exe", exename, sizeof (exename) - 1);
     if (rc == -1)
         return 0;
     exename[rc] = '\0';
+
+    if (homedir == NULL)
+        homedir = ".";  /* !!! FIXME */
+
+    len = snprintf(logpath, sizeof (logpath), "%s/.mojocrash_logs", homedir);
+    if (len >= sizeof (logpath) - 16)
+        return 0;
     return 1;
 } /* MOJOCRASH_platform_init */
-
 
 
 #if TEST_PLATFORM

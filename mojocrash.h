@@ -23,19 +23,24 @@ extern "C" {
 #define MOJOCRASH_MAX_URL_STRING 128
 
 
+typedef void (*MOJOCRASH_catcher)(int sig);
 typedef int (*MOJOCRASH_get_callstack_callback)(void *addr);
-
-typedef int (*MOJOCRASH_get_objects_callback)(const char *fname,
-                                              void *addr, unsigned long len);
+typedef int (*MOJOCRASH_get_objects_callback)(const char *fname, void *addr,
+                                              unsigned long len);
+typedef int (*MOJOCRASH_get_etc_callback)(const char *key, const char *value);
 
 typedef struct MOJOCRASH_hooks
 {
-    int (*install_crash_catcher)(void (*catcher)(int sig));
-    int (*app_crash_catcher_preflight)(int sig);
-    void (*get_callstack)(MOJOCRASH_get_callstack_callback callback);
-    void (*get_objects)(MOJOCRASH_get_objects_callback callback);
-    const char *(*get_other_info)(void);
-    int (*app_crash_catcher_post)(int sig);
+    int (*install_crash_catcher)(MOJOCRASH_catcher catcher);
+    int (*preflight)(int sig, int crash_count);
+    int (*start_crashlog)(void);
+    int (*new_crashlog_line)(const char *str);
+    int (*get_callstack)(MOJOCRASH_get_callstack_callback callback);
+    int (*get_objects)(MOJOCRASH_get_objects_callback callback);
+    int (*get_etc)(MOJOCRASH_get_etc_callback callback);
+    int (*end_crashlog)(void);
+    int (*postflight)(void);
+    void (*die)(void);
 } MOJOCRASH_hooks;
 
 
