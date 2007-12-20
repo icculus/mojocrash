@@ -121,8 +121,10 @@ int MOJOCRASH_platform_start_crashlog(void)
 {
     const char *MOJOCRASH_appname = "MyAppName";  /* !!! FIXME: change this. */
     char *path1 = logpath + strlen(logpath);
-    char *path2 = path1 + strlen(MOJOCRASH_appname);
+    char *path2 = path1 + 1 + strlen(MOJOCRASH_appname);
     int num = 0;
+
+    strcpy(path1 + 1, MOJOCRASH_appname);
 
     /*
      * if crashlog isn't -1, we might be in a double-fault, but it might be
