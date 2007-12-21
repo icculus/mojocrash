@@ -1,4 +1,7 @@
-#ifdef __linux__
+#define __MOJOCRASH_INTERNAL__ 1
+#include "mojocrash_internal.h"
+
+#if MOJOCRASH_PLATFORM_LINUX
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +10,8 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/time.h>
+#include <sys/utsname.h>
 
 /* this all relies on Linux/ELF/glibc specific APIs. */
 #define _GNU_SOURCE
@@ -14,15 +19,14 @@
 #include <link.h>
 #include <execinfo.h>
 
-#define __MOJOCRASH_INTERNAL__ 1
-#include "mojocrash_internal.h"
-
 /* We're memory-hungry here, in hopes of avoiding malloc() during a crash. */
 #define MAX_CALLSTACKS 1024
 static void *callstack[MAX_CALLSTACKS];
 static char logpath[PATH_MAX+1];
 static char exename[PATH_MAX+1];
+static char osversion[64];
 static int crashlogfd = -1;
+static struct timeval starttime;
 
 #define STATICARRAYLEN(x) (sizeof (x) / sizeof ((x)[0]))
 
@@ -179,15 +183,51 @@ int MOJOCRASH_platform_end_crashlog(void)
 } /* MOJOCRASH_platform_end_crashlog */
 
 
+const char *MOJOCRASH_platform_version(void)
+{
+    return osversion;
+} /* MOJOCRASH_platform_version */
+
+
+long MOJOCRASH_platform_appuptime(void)
+{
+    struct timeval tv;
+    long retval = 0;
+    gettimeofday(&tv, NULL);
+    retval = ( (tv.tv_sec - starttime.tv_sec) +
+               ((tv.tv_usec - starttime.tv_usec) / 1000000) );
+    return ((retval >= 0) ? retval : -1);
+} /* MOJOCRASH_platform_appuptime */
+
+
+long MOJOCRASH_platform_now(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec;
+} /* MOJOCRASH_platform_now */
+
+
 int MOJOCRASH_platform_init(void)
 {
-    const char *homedir = getenv("HOME");
+    const char *homedir = NULL;
+    struct utsname un;
     int len = 0;
-    ssize_t rc = readlink("/proc/self/exe", exename, sizeof (exename) - 1);
+    ssize_t rc = 0;
+
+    gettimeofday(&starttime, NULL);
+
+    if (uname(&un) == 0)
+        snprintf(osversion, sizeof (osversion), "%s", un.release);
+    else
+        strcpy(osversion, "???");
+
+    rc = readlink("/proc/self/exe", exename, sizeof (exename) - 1);
     if (rc == -1)
         return 0;
     exename[rc] = '\0';
 
+    homedir = getenv("HOME");
     if (homedir == NULL)
         homedir = ".";  /* !!! FIXME */
 

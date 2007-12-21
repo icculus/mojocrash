@@ -66,10 +66,62 @@ static int etc_callback(const char *key, const char *value)
 } /* etc_callback */
 
 
+static int get_basics(int sig)
+{
+    snprintf(scratch, sizeof (scratch),
+             "MOJOCRASH %d.%d.%d", MOJOCRASH_VERSION_MAJOR,
+             MOJOCRASH_VERSION_MINOR, MOJOCRASH_VERSION_PATCH);
+    if (!hooks.new_crashlog_line(scratch))
+        return 0;
+
+    snprintf(scratch, sizeof (scratch),
+             "CRASHLOG_VERSION %d",
+             MOJOCRASH_LOG_FORMAT_VERSION);
+    if (!hooks.new_crashlog_line(scratch))
+        return 0;
+
+    snprintf(scratch, sizeof (scratch), "APPLICATION_NAME %s", appname);
+    if (!hooks.new_crashlog_line(scratch))
+        return 0;
+
+    snprintf(scratch, sizeof (scratch), "APPLICATION_VERSION %s", version);
+    if (!hooks.new_crashlog_line(scratch))
+        return 0;
+
+    if (!hooks.new_crashlog_line("PLATFORM_NAME " MOJOCRASH_PLATFORM_NAME))
+        return 0;
+
+    if (!hooks.new_crashlog_line("CPUARCH_NAME " MOJOCRASH_PLATFORM_CPUARCH))
+        return 0;
+
+    snprintf(scratch, sizeof (scratch), "PLATFORM_VERSION %s",
+             MOJOCRASH_platform_version());
+    if (!hooks.new_crashlog_line(scratch))
+        return 0;
+
+    snprintf(scratch, sizeof (scratch), "CRASH_SIGNAL %d", sig);
+    if (!hooks.new_crashlog_line(scratch))
+        return 0;
+
+    snprintf(scratch, sizeof (scratch), "APPLICATION_UPTIME %ld",
+             MOJOCRASH_platform_appuptime());
+    if (!hooks.new_crashlog_line(scratch))
+        return 0;
+
+    snprintf(scratch, sizeof (scratch), "CRASH_TIME %ld",
+             MOJOCRASH_platform_now());
+    if (!hooks.new_crashlog_line(scratch))
+        return 0;
+
+    return 1;
+} /* get_basics */
+
 static int crash_catcher_internal(int sig, int crash_count)
 {
     if (!hooks.preflight(sig, crash_count)) return 0;
     if (!hooks.start_crashlog()) return 0;
+    if (!get_basics(sig)) return 0;
+    if (!hooks.new_crashlog_line("")) return 0;
     if (!hooks.get_objects(objects_callback)) return 0;
     if (!hooks.new_crashlog_line("")) return 0;
     if (!hooks.get_callstack(callstack_callback)) return 0;
