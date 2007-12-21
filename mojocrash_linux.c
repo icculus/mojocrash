@@ -1,5 +1,5 @@
 #define __MOJOCRASH_INTERNAL__ 1
-#include "mojocrash_internal.h"
+#include "mojocrash_platform.h"
 
 #if MOJOCRASH_PLATFORM_LINUX
 
@@ -18,6 +18,8 @@
 #define __USE_GNU
 #include <link.h>
 #include <execinfo.h>
+
+#include "mojocrash_internal.h"
 
 /* We're memory-hungry here, in hopes of avoiding malloc() during a crash. */
 #define MAX_CALLSTACKS 1024
