@@ -13,7 +13,7 @@
 #include <sys/time.h>
 #include <sys/utsname.h>
 
-/* this all relies on Linux/ELF/glibc specific APIs. */
+/* this largely relies on Linux/ELF/glibc specific APIs. */
 #define _GNU_SOURCE
 #define __USE_GNU
 #include <link.h>
@@ -21,39 +21,58 @@
 
 #include "mojocrash_internal.h"
 
-/* We're memory-hungry here, in hopes of avoiding malloc() during a crash. */
-#define MAX_CALLSTACKS 1024
-static void *callstack[MAX_CALLSTACKS];
+#define STATICARRAYLEN(x) (sizeof (x) / sizeof ((x)[0]))
+
 static char logpath[PATH_MAX+1];
 static char exename[PATH_MAX+1];
 static char osversion[64];
 static int crashlogfd = -1;
 static struct timeval starttime;
 
-#define STATICARRAYLEN(x) (sizeof (x) / sizeof ((x)[0]))
+typedef void (*MOJOCRASH_sighandler)(int sig);
+static MOJOCRASH_sighandler orig_SIGSEGV_handler = NULL;
+static MOJOCRASH_sighandler orig_SIGBUS_handler = NULL;
+static MOJOCRASH_sighandler orig_SIGFPE_handler = NULL;
+static MOJOCRASH_sighandler orig_SIGILL_handler = NULL;
+static MOJOCRASH_sighandler orig_SIGABRT_handler = NULL;
 
 int MOJOCRASH_platform_install_crash_catcher(void (*catcher)(int sig))
 {
-    signal(SIGSEGV, catcher);
-    signal(SIGBUS, catcher);
-    signal(SIGFPE, catcher);
-    signal(SIGILL, catcher);
-    signal(SIGABRT, catcher);
-    return 1;
+    #define INSTALL_SIGHANDLER(x) orig_#x#_handler = signal(x, catcher)
+    INSTALL_SIGHANDLER(SIGSEGV);
+    INSTALL_SIGHANDLER(SIGBUS);
+    INSTALL_SIGHANDLER(SIGFPE);
+    INSTALL_SIGHANDLER(SIGILL);
+    INSTALL_SIGHANDLER(SIGABRT);
+    #undef INSTALL_SIGHANDLER
 } /* MOJOCRASH_platform_install_crash_catcher */
 
 
 int MOJOCRASH_platform_get_callstack(MOJOCRASH_get_callstack_callback cb)
 {
-    /* Ugh, is there a way to iterate this without having to pass an array? */
-    int frames = backtrace(callstack, STATICARRAYLEN(callstack));
-    int i;
+    #if MOJOCRASH_PLATFORM_POWERPC || MOJOCRASH_PLATFORM_POWERPC_64
+        #define MOJOCRASH_USE_GLIBC_BACKTRACE 1  /* !!! FIXME */
+    #elif MOJOCRASH_PLATFORM_X86 || MOJOCRASH_PLATFORM_X86_64
+        #define MOJOCRASH_USE_GLIBC_BACKTRACE 1  /* !!! FIXME */
+    #else
+        #error No backtrace support for this CPU arch.
+        #error  ...Maybe you should define MOJOCRASH_USE_GLIBC_BACKTRACE...
+    #endif
 
-    for (i = 0; i < frames; i++)
-    {
-        if (!cb(callstack[i]))
-            return 0;
-    } /* for */
+    #if MOJOCRASH_USE_GLIBC_BACKTRACE
+        /* We're memory-hungry, in hopes of avoiding malloc() during crash. */
+        static void *callstack[1024];
+
+        /* !!! FIXME: would be nice to have a backtrace_callback() in glibc. */
+        int frames = backtrace(callstack, STATICARRAYLEN(callstack));
+        int i;
+
+        for (i = 0; i < frames; i++)
+        {
+            if (!cb(callstack[i]))
+                return 0;
+        } /* for */
+    #endif
 
     return 1;
 } /* MOJOCRASH_platform_get_callstack */
@@ -239,38 +258,5 @@ int MOJOCRASH_platform_init(void)
     return 1;
 } /* MOJOCRASH_platform_init */
 
-
-#if TEST_PLATFORM
-
-static int testobjscb(const char *fname, void *addr, unsigned long len)
-{
-    printf("DSO: %s/%p/%ld\n", fname, addr, len);
-    return 1;
-}
-
-static int testcallstackcb(void *addr)
-{
-    printf("STACK: %p\n", addr);
-    return 1;
-}
-
-static int z() { return MOJOCRASH_platform_get_callstack(testcallstackcb); }
-static int y() { return z(); }
-static int x() { return y(); }
-static int test_callstack() { return x(); };
-
-int main(int argc, char **argv)
-{
-    if (!MOJOCRASH_platform_init())
-        return 1;
-    if (!MOJOCRASH_platform_get_objects(testobjscb))
-        printf("MOJOCRASH_platform_get_objects() failed\n");
-    if (!test_callstack())
-        printf("MOJOCRASH_platform_get_callstack() failed\n");
-    return 0;
-} /* main */
-
-#endif /* TEST_PLATFORM */
-
-#endif /* __linux__ */
+#endif /* MOJOCRASH_PLATFORM_LINUX */
 

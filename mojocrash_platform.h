@@ -25,15 +25,19 @@
 #endif
 
 #if defined(__powerpc64__)
+#define MOJOCRASH_PLATFORM_POWERPC_64 1
 #define MOJOCRASH_PLATFORM_64BIT 1
 #define MOJOCRASH_PLATFORM_CPUARCH "powerpc64"
 #elif defined(__ppc__) || defined(__powerpc__) || defined(__POWERPC__)
+#define MOJOCRASH_PLATFORM_POWERPC 1
 #define MOJOCRASH_PLATFORM_32BIT 1
 #define MOJOCRASH_PLATFORM_CPUARCH "powerpc"
 #elif defined(__x86_64__) || defined(_M_X64)
+#define MOJOCRASH_PLATFORM_X86_64 1
 #define MOJOCRASH_PLATFORM_64BIT 1
 #define MOJOCRASH_PLATFORM_CPUARCH "x86-64"
 #elif defined(__X86__) || defined(__i386__) || defined(i386) || defined (_M_IX86) || defined(__386__)
+#define MOJOCRASH_PLATFORM_X86 1
 #define MOJOCRASH_PLATFORM_32BIT 1
 #define MOJOCRASH_PLATFORM_CPUARCH "x86"
 #else
