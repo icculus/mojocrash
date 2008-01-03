@@ -128,6 +128,7 @@ static int crash_catcher_internal(int sig, int crash_count)
     if (!hooks.new_crashlog_line("")) return 0;
     if (!hooks.get_etc(etc_callback)) return 0;
     if (!hooks.new_crashlog_line("")) return 0;
+    if (!hooks.new_crashlog_line("END")) return 0;
     if (!hooks.end_crashlog()) return 0;
     if (!hooks.postflight()) return 0;
     return 1;
