@@ -32,10 +32,43 @@ void MOJOCRASH_StringCopy(char *dst, const char *src)
 } /* MOJOCRASH_StringCopy */
 
 
+char *MOJOCRASH_LongToString(long num, char *str)
+{
+    const int negative = (num < 0);
+    const long orignum = num;
+
+    /* count this out so we don't have to reverse it later. */
+    do
+    {
+        str++;
+        num /= 10;
+    } while (num);
+
+    if (negative)
+        str++;
+
+    num = (negative) ? -orignum : orignum;
+
+    /* now write out the string from back to front. */
+    *str = '\0';
+    do
+    {
+        str--;
+        *str = ('0' + (num % 10));
+        num /= 10;
+    } while (num);
+
+    if (negative)
+        *(--str) = '-';
+
+    return str;
+} /* MOJOCRASH_LongToString */
+
 
 static int installed = 0;
 static MOJOCRASH_hooks hooks;
 static char scratch[256];
+static char numcvt[32];
 static char appname[MOJOCRASH_MAX_APPNAME_STRING];
 static char version[MOJOCRASH_MAX_VERSION_STRING];
 static char url[MOJOCRASH_MAX_URL_STRING];
