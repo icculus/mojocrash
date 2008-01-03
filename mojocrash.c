@@ -32,36 +32,40 @@ void MOJOCRASH_StringCopy(char *dst, const char *src)
 } /* MOJOCRASH_StringCopy */
 
 
+static char *flipstring(char *strstart, char *str)
+{
+    char *retval = strstart;
+    while (str > strstart)
+    {
+        const char tmp = *str;
+        *(str--) = *strstart;
+        *(strstart++) = tmp;
+    } /* while */
+
+    return retval;
+} /* flipstring */
+
+
 char *MOJOCRASH_LongToString(long num, char *str)
 {
+    char *strstart = str;
     const int negative = (num < 0);
-    const long orignum = num;
 
-    /* count this out so we don't have to reverse it later. */
+    if (negative)
+        num = -num;
+
+    /* write out the string reversed. */
+    *(str++) = '\0';   /* write out the string reversed. */
     do
     {
-        str++;
+        *(str++) = ('0' + (num % 10));
         num /= 10;
     } while (num);
 
     if (negative)
-        str++;
+        *(str++) = '-';
 
-    num = (negative) ? -orignum : orignum;
-
-    /* now write out the string from back to front. */
-    *str = '\0';
-    do
-    {
-        str--;
-        *str = ('0' + (num % 10));
-        num /= 10;
-    } while (num);
-
-    if (negative)
-        *(--str) = '-';
-
-    return str;
+    return flipstring(strstart, str-1);
 } /* MOJOCRASH_LongToString */
 
 
