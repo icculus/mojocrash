@@ -217,9 +217,9 @@ static void defhook_die(void)
     MOJOCRASH_platform_die(0);
 } /* defhook_die */
 
-static void init_hooks(const MOJOCRASH_hooks *_hooks)
+static void init_hooks(const MOJOCRASH_hooks *h)
 {
-    #define INIT_HOOK(H) hooks.H = _hooks->H ? _hooks->H : defhook_##H;
+    #define INIT_HOOK(H) hooks.H = ((h && h->H) ? h->H : defhook_##H)
     INIT_HOOK(install_crash_catcher);
     INIT_HOOK(preflight);
     INIT_HOOK(start_crashlog);
@@ -246,7 +246,6 @@ int MOJOCRASH_install(const char *_appname, const char *_version,
     if (_appname == NULL) return 0;
     if (_version == NULL) return 0;
     if (_url == NULL) return 0;
-    if (_hooks == NULL) return 0;
     if (strlen(_appname) >= MOJOCRASH_MAX_APPNAME_STRING) return 0;
     if (strlen(_version) >= MOJOCRASH_MAX_VERSION_STRING) return 0;
     if (strlen(_url) >= MOJOCRASH_MAX_URL_STRING) return 0;
