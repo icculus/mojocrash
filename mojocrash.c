@@ -69,6 +69,24 @@ char *MOJOCRASH_LongToString(long num, char *str)
 } /* MOJOCRASH_LongToString */
 
 
+char *MOJOCRASH_PtrToString(void *ptr, char *str)
+{
+    /* !!! FIXME: "long" isn't right on win64, probably other places. */
+    unsigned long num = (unsigned long) ptr;
+    char *strstart = str;
+
+    /* write out the string reversed. */
+    *(str++) = '\0';   /* write out the string reversed. */
+    do
+    {
+        *(str++) = ('0' + (num % 10));
+        num /= 10;
+    } while (num);
+
+    return flipstring(strstart, str-1);
+} /* MOJOCRASH_PtrToString */
+
+
 static int installed = 0;
 static MOJOCRASH_hooks hooks;
 static char scratch[256];
