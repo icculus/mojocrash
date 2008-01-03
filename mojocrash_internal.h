@@ -38,6 +38,10 @@ int MOJOCRASH_StringLength(const char *str);
 #define strcpy(x,y) MOJOCRASH_StringCopy(x,y)
 void MOJOCRASH_StringCopy(char *dst, const char *str);
 
+char *MOJOCRASH_LongToString(long num, char *str);
+char *MOJOCRASH_PtrToString(void *ptr, char *str);
+
+
 /*
  * These are all functions that are platform-specific. Usually they need
  *  unportable system APIs, or they handle things in unique ways, or both.

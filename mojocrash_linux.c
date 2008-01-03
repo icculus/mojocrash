@@ -164,7 +164,12 @@ int MOJOCRASH_platform_start_crashlog(void)
         crashlogfd = -1;
     } /* if */
 
-    while (crashlogfd == -1)
+    /*
+     * If there are 1000+ crashlogs, either they aren't being reported, or
+     *  we have a problem here that is causing an infinite loop. Either way,
+     *  give up at that point.
+     */
+    while ((crashlogfd == -1) && (num < 1000))
     {
         /*
          * Dir won't exist before first crash, and the reporter app may
@@ -181,7 +186,7 @@ int MOJOCRASH_platform_start_crashlog(void)
         num++;
     } /* while */
 
-    return 1;
+    return (crashlogfd != -1);
 } /* MOJOCRASH_platform_start_crashlog */
 
 
