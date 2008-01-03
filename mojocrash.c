@@ -145,7 +145,7 @@ static void crash_catcher(int sig)
     crash_count++;
     crash_catcher_internal(sig, crash_count);
     hooks.die();  /* may not return. */
-    crash_count = 0;  /* in case we did... */
+    crash_count--;  /* in case we did... */
 } /* crash_catcher */
 
 
