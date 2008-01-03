@@ -45,6 +45,7 @@ int MOJOCRASH_platform_install_crash_catcher(void (*catcher)(int sig))
     INSTALL_SIGHANDLER(SIGILL);
     INSTALL_SIGHANDLER(SIGABRT);
     #undef INSTALL_SIGHANDLER
+    return 1;
 } /* MOJOCRASH_platform_install_crash_catcher */
 
 
