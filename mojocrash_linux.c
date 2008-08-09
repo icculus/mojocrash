@@ -81,13 +81,8 @@ int MOJOCRASH_platform_get_callstack(MOJOCRASH_get_callstack_callback cb)
 
 static inline const char *fname_without_dirs(const char *path)
 {
-    const char *retval;
-    for (retval = path; *path != '\0'; path++)
-    {
-        if (*path == '/')
-            retval = path+1;
-    } /* for */
-    return retval;
+    const char *retval = strrchr(path);
+    return ((retval) ? (retval+1) : path);
 } /* fname_without_dirs */
 
 
