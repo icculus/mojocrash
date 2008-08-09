@@ -17,6 +17,7 @@
 #include "mojocrash_internal.h"
 
 static char logpath[PATH_MAX+1];
+static char osversion[64];
 static int crashlogfd = -1;
 static struct timeval starttime;
 
