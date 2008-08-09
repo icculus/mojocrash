@@ -127,7 +127,8 @@ static int callstack_callback(void *addr)
     return hooks.new_crashlog_line(scratch);
 } /* callstack_callback */
 
-static int objects_callback(const char *fname, void *addr, unsigned long len)
+static int objects_callback(const char *fname, const void *addr,
+                            unsigned long len)
 {
     char *str = scratch;
     int avail = sizeof (scratch);
