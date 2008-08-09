@@ -41,6 +41,12 @@ void MOJOCRASH_StringCopy(char *dst, const char *str);
 char *MOJOCRASH_LongToString(long num, char *str);
 char *MOJOCRASH_PtrToString(void *ptr, char *str);
 
+/* helper macro for counting items in a static array. */
+#define STATICARRAYLEN(x) (sizeof (x) / sizeof ((x)[0]))
+
+/* obviously only available on Unix. Call it from your platform_init()... */
+int MOJOCRASH_unix_init(const char *_logpath);
+
 
 /*
  * These are all functions that are platform-specific. Usually they need
