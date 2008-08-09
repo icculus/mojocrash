@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <sys/utsname.h>
 
 #include "mojocrash_internal.h"
