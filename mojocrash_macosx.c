@@ -95,6 +95,7 @@ int MOJOCRASH_platform_init(void)
 {
     char logpath[PATH_MAX+1];
     const char *homedir = NULL;
+    int len = 0;
 
     /* !!! FIXME: dlopen() limits you to 10.3+ ... */
     void *lib = dlopen("libSystem.dylib", RTLD_GLOBAL | RTLD_NOW);

@@ -90,6 +90,7 @@ int MOJOCRASH_platform_init(void)
     char logpath[PATH_MAX+1];
     const char *homedir = NULL;
     ssize_t rc = 0;
+    int len = 0;
 
     rc = readlink("/proc/self/exe", exename, sizeof (exename) - 1);
     if (rc == -1)
