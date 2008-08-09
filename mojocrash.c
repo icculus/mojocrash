@@ -102,10 +102,10 @@ char *MOJOCRASH_ULongToString(unsigned long num, char *str)
 } /* MOJOCRASH_ULongToString */
 
 
-char *MOJOCRASH_PtrToString(void *ptr, char *str)
+char *MOJOCRASH_PtrToString(const void *ptr, char *str)
 {
     /* !!! FIXME: "long" isn't right on win64, probably other places. */
-    return MOJOCRASH_ULongToString((unsigned long) ptr, str);
+    return MOJOCRASH_ULongToString((const unsigned long) ptr, str);
 } /* MOJOCRASH_PtrToString */
 
 
