@@ -29,6 +29,11 @@ typedef struct segment_command SegmentCommand;
  * The stackwalking code was, a lifetime ago, based on MoreBacktrace.c from
  *  Apple's MoreIsBetter examples ... but obviously it's a different beast
  *  now. The MoreIsBetter license allows this sort of thievery.
+ *
+ * The ABI Function Call Guide was helpful, for moving this from 32-bit PPC
+ *  two four total CPU architectures:
+ *
+ *  http://developer.apple.com/documentation/DeveloperTools/Conceptual/LowLevelABI/Introduction.html
  */
 
 
