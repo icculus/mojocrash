@@ -45,7 +45,7 @@ char *MOJOCRASH_PtrToString(const void *ptr, char *str);
 #define STATICARRAYLEN(x) (sizeof (x) / sizeof ((x)[0]))
 
 /* obviously only available on Unix. Call it from your platform_init()... */
-int MOJOCRASH_unix_init(const char *_logpath);
+int MOJOCRASH_unix_init(const char *_logpath, const char *_osversion);
 
 
 /*

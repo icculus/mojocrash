@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <sys/utsname.h>
 
 /* this largely relies on Linux/ELF/glibc specific APIs. */
 #define _GNU_SOURCE
@@ -88,6 +89,8 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
 int MOJOCRASH_platform_init(void)
 {
     char logpath[PATH_MAX+1];
+    char osversion[64];
+    struct utsname un;
     const char *homedir = NULL;
     ssize_t rc = 0;
     int len = 0;
@@ -105,7 +108,12 @@ int MOJOCRASH_platform_init(void)
     if (len >= sizeof (logpath) - 16)
         return 0;
 
-    return MOJOCRASH_unix_init(logpath);
+    if (uname(&un) == 0)
+        snprintf(osversion, sizeof (osversion), "%s", un.release);
+    else
+        strcpy(osversion, "???");
+
+    return MOJOCRASH_unix_init(logpath, osversion);
 } /* MOJOCRASH_platform_init */
 
 #endif /* MOJOCRASH_PLATFORM_LINUX */

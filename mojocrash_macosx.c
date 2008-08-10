@@ -13,7 +13,7 @@
 #include <mach/mach_init.h>
 #include <execinfo.h>
 #include <dlfcn.h>
-#include <Gestalt.h>
+#include <Carbon/Carbon.h>
 
 #if MOJOCRASH_PLATFORM_64BIT
 typedef struct mach_header_64 MachHeader;
@@ -198,20 +198,36 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
 int MOJOCRASH_platform_init(void)
 {
     char logpath[PATH_MAX+1];
+    char osversion[64];
     const char *homedir = NULL;
     long ver = 0;
     int len = 0;
     void *lib = NULL;
     uintptr_t sigtramp_len = 0;
     int must_have_backtrace = 0;
-    long major, minor;
+    long major, minor, patch;
 
 	if (Gestalt(gestaltSystemVersion, &ver) != noErr)
         return 0;
 
-    major = ((ver & 0xFF) >> 8);
-    minor = ((ver & 0xF0) >> 4);
-    /*patch = (ver & 0xF);*/
+    if (ver < 0x1030)
+    {
+        major = ((ver & 0xFF) >> 8);
+        major = (((major / 16) * 10) + (major % 16));
+        minor = ((ver & 0xF0) >> 4);
+        patch = (ver & 0xF);
+    } /* if */
+    else
+    {
+    	if (Gestalt(gestaltSystemVersionMajor, &major) != noErr)
+            return 0;
+    	if (Gestalt(gestaltSystemVersionMinor, &minor) != noErr)
+            return 0;
+    	if (Gestalt(gestaltSystemVersionBugFix, &patch) != noErr)
+            return 0;
+    } /* else */
+
+    snprintf(osversion, sizeof (osversion), "%d.%d.%d", major, minor, patch);
 
     /*
      * If we don't have backtrace (and sometimes when we do!), we need to
@@ -243,7 +259,7 @@ int MOJOCRASH_platform_init(void)
     };
     #undef XX
 
-    if (major != 0x10)
+    if (major != 10)
         must_have_backtrace = 1;  /* not Mac OS X 10.x? */
     else if (minor >= STATICARRAYLEN(sigtramps))
         must_have_backtrace = 1;  /* newer Mac OS X than we know about. */
@@ -283,7 +299,7 @@ int MOJOCRASH_platform_init(void)
     if (len >= sizeof (logpath) - 16)
         return 0;
 
-    return MOJOCRASH_unix_init(logpath);
+    return MOJOCRASH_unix_init(logpath, osversion);
 } /* MOJOCRASH_platform_init */
 
 #endif /* MOJOCRASH_PLATFORM_MACOSX */

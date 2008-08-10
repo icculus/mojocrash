@@ -12,7 +12,6 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/utsname.h>
 
 #include "mojocrash_internal.h"
 
@@ -142,16 +141,15 @@ long MOJOCRASH_platform_now(void)
 } /* MOJOCRASH_platform_now */
 
 
-int MOJOCRASH_unix_init(const char *_logpath)
+int MOJOCRASH_unix_init(const char *_logpath, const char *_osversion)
 {
-    struct utsname un;
     int len = 0;
 
     gettimeofday(&starttime, NULL);
-    if (uname(&un) == 0)
-        snprintf(osversion, sizeof (osversion), "%s", un.release);
-    else
-        strcpy(osversion, "???");
+
+    len = snprintf(osversion, sizeof (osversion), "%s", _osversion);
+    if (len >= sizeof (osversion))
+        return 0;
 
     len = snprintf(logpath, sizeof (logpath), "%s", _logpath);
     if (len >= sizeof (logpath) - 16)
