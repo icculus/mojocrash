@@ -82,7 +82,7 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
             } /* if */
         } /* if */
 
-        if ( (sp == 0) || (sp & (sizeof (uintptr_t)-1)) || (sp < lower_bound) )
+        if ((sp == 0) || (sp & (sizeof (uintptr_t)-1)) || (sp <= lower_bound))
             break;  /* Bogus frame pointer. Give up. */
 
         if (isSigtramp) /* the dreaded _sigtramp! Have to skip past it. */
