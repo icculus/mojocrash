@@ -198,7 +198,7 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
 int MOJOCRASH_platform_init(void)
 {
     char logpath[PATH_MAX+1];
-    char osversion[64];
+    char osver[64];
     const char *homedir = NULL;
     long ver = 0;
     int len = 0;
@@ -227,7 +227,7 @@ int MOJOCRASH_platform_init(void)
             return 0;
     } /* else */
 
-    snprintf(osversion, sizeof (osversion), "%d.%d.%d", major, minor, patch);
+    snprintf(osver, sizeof (osver), "%ld.%ld.%ld", major, minor, patch);
 
     /*
      * If we don't have backtrace (and sometimes when we do!), we need to
@@ -299,7 +299,7 @@ int MOJOCRASH_platform_init(void)
     if (len >= sizeof (logpath) - 16)
         return 0;
 
-    return MOJOCRASH_unix_init(logpath, osversion);
+    return MOJOCRASH_unix_init(logpath, osver);
 } /* MOJOCRASH_platform_init */
 
 #endif /* MOJOCRASH_PLATFORM_MACOSX */
