@@ -62,6 +62,14 @@ static inline int safe_read_ptr(const uintptr_t src, uintptr_t *dst)
 
 static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
 {
+    #if MOJOCRASH_PLATFORM_POWERPC || MOJOCRASH_PLATFORM_POWERPC_64
+    const uintptr_t lr_offset = sizeof (void*) * 2; /* two ptrs above frame. */
+    #elif MOJOCRASH_PLATFORM_X86 || MOJOCRASH_PLATFORM_X86_64
+    const uintptr_t lr_offset = sizeof (void*);  /* one ptr above frame. */
+    #else
+    #error Unhandled CPU arch.
+    #endif
+
     uintptr_t sp = 0;
     uintptr_t pc = 0;
     uintptr_t lower_bound = 0;
@@ -97,8 +105,8 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
         if (!safe_read_ptr(sp, &nextFrame))
             break;  /* Can't read? Bogus frame pointer. Give up. */
 
-        /* get the LR (two pointers in to current stack frame). */
-        else if (!safe_read_ptr(nextFrame + (sizeof (uintptr_t) * 2), &nextPC))
+        /* get the stored Link Register value. */
+        if (!safe_read_ptr(nextFrame + lr_offset), &nextPC))
             break;  /* Can't read? Bogus frame pointer. Give up. */
 
         lower_bound = sp;
