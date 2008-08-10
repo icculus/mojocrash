@@ -235,6 +235,7 @@ int MOJOCRASH_platform_init(void)
         {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0},        {0,0},
         #endif
     };
+    #undef XX
 
     if (major != 0x10)
         must_have_backtrace = 1;  /* not Mac OS X 10.x? */
