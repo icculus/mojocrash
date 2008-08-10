@@ -198,15 +198,14 @@ int MOJOCRASH_platform_init(void)
     void *lib = NULL;
     uintptr_t sigtramp_len = 0;
     int must_have_backtrace = 0;
+    long major, minor;
 
 	if (Gestalt(gestaltSystemVersion, &ver) != noErr)
         return 0;
 
-    /* Apple never shipped an OS X before 10.4 for anyting but ppc32. */
-    #if !MOJOCRASH_PLATFORM_POWERPC
-    if ((ver & 0xFFFF) < 0x1040)
-        return 0;  /* shouldn't happen... */
-    #endif
+    major = ((ver & 0xFF) >> 8);
+    minor = ((ver & 0xF0) >> 4);
+    /*patch = (ver & 0xF);*/
 
     /*
      * If we don't have backtrace (and sometimes when we do!), we need to
@@ -221,76 +220,32 @@ int MOJOCRASH_platform_init(void)
      *  releases. It's an inexact science.  :)
      */
 
-    if (ver & 0xFFF0) <= 0x1000)  /* 10.0.x? ("Cheetah") */
-        return 0;  /* 10.0.x is unsupported. Sorry. */
-
-    else if (ver & 0xFFF0) == 0x1010)  /* 10.1.x? ("Puma") */
-    {
-        sigtramp_frame_offset = 0x7C;
-        sigtramp_len = 0;  /* !!! FIXME */
-        return 0;  /* !!! FIXME */
-    } /* else if */
-
-    else if (ver & 0xFFF0) == 0x1020)  /* 10.2.x? ("Jaguar") */
-    {
-        sigtramp_frame_offset = 0xA4;
-        sigtramp_len = 0;  /* !!! FIXME */
-        return 0;  /* !!! FIXME */
-    } /* else if */
-
-    else if (ver & 0xFFF0) == 0x1030)  /* 10.3.x? ("Panther") */
-    {
-        sigtramp_frame_offset = 0; /* !!! FIXME */
-        sigtramp_len = 0;  /* !!! FIXME */
-        return 0;  /* !!! FIXME */
-    } /* else if */
-
-    else if (ver & 0xFFF0) == 0x1040)  /* 10.4.x? ("Tiger") */
-    {
+    #define XX 0  /* just to show it's unsupported. */
+    static const struct { uintptr_t offset; uintptr_t len; } sigtramps[] = {
+        /* 10.0, 10.1, 10.2, 10.3, 10.4, 10.5 */
         #if MOJOCRASH_PLATFORM_POWERPC
-            sigtramp_frame_offset = 0xFC;
-            sigtramp_len = 0x248;
+        {XX,XX}, {0x7C,0}, {0xA4,0}, {0,0},   {0xFC,0x248}, {0x9C,0x50},
         #elif MOJOCRASH_PLATFORM_POWERPC_64
-            sigtramp_frame_offset = 0;  /* !!! FIXME */
-            sigtramp_len = 0x27c;
-            return 0;  /* !!! FIXME */
-        #elif MOJOCRASH_PLATFORM_X86_64
-            sigtramp_frame_offset = 0; /* !!! FIXME */
-            sigtramp_len = 0;  /* !!! FIXME */
-            return 0;  /* !!! FIXME */
+        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0x27C},    {0xB8,0x50},
         #elif MOJOCRASH_PLATFORM_X86
-            sigtramp_frame_offset = 0; /* !!! FIXME */
-            sigtramp_len = 0;  /* !!! FIXME */
-            return 0;  /* !!! FIXME */
-        #else
-            must_have_backtrace = 1;  /* hopefully we have it! */
-        #endif
-    } /* else if */
-
-    else if (ver & 0xFFF0) == 0x1050)  /* 10.5.x? ("Leopard") */
-    {
-        /* PowerPC32/64 have backtrace(), but it fails in signal handlers. */
-        #if MOJOCRASH_PLATFORM_POWERPC
-            sigtramp_frame_offset = 0x9C;
-            sigtramp_len = 0x50;
-        #elif MOJOCRASH_PLATFORM_POWERPC_64
-            sigtramp_frame_offset = 0xB8;
-            sigtramp_len = 0x50;
+        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0},        {0x80,0x44},
         #elif MOJOCRASH_PLATFORM_X86_64
-            sigtramp_frame_offset = 0; /* !!! FIXME */
-            sigtramp_len = 0x30;
-            return 0;  /* !!! FIXME */
-        #elif MOJOCRASH_PLATFORM_X86
-            sigtramp_frame_offset = 0x80;
-            sigtramp_len = 0x44;
+        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0},        {0,0x30},
         #else
-            must_have_backtrace = 1;  /* hopefully we have it! */
+        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0},        {0,0},
         #endif
-    } /* else if */
+    };
 
+    if (major != 0x10)
+        must_have_backtrace = 1;  /* not Mac OS X 10.x? */
+    else if (minor >= STATICARRAYLEN(sigtramps))
+        must_have_backtrace = 1;  /* newer Mac OS X than we know about. */
     else
     {
-        must_have_backtrace = 1; /* Unknown OS version? We need backtrace(). */
+        sigtramp_frame_offset = sigtramps[minor].offset;
+        sigtramp_len = sigtramps[minor].len;
+        if ((sigtramp_frame_offset == 0) || (sigtramp_len == 0))
+            must_have_backtrace = 1;  /* we lack data. */
     } /* else */
 
     /* !!! FIXME: dlopen() limits you to 10.3+ ... */
