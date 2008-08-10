@@ -71,7 +71,7 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
         uintptr_t nextFrame, nextPC, dummy;
         const int isSigtramp = ((pc >= sigtramp_start) && (pc < sigtramp_end));
 
-        if ( ((pc & 0x03) == 0) && (safe_read_ptr(pc, &dummy)) )
+        if (((pc & (sizeof (uintptr_t)-1)) == 0) && (safe_read_ptr(pc, &dummy)))
         {
             if (!isSigtramp)
             {
