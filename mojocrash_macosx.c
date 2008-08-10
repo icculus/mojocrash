@@ -84,7 +84,15 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
         uintptr_t nextFrame, nextPC, dummy;
         const int isSigtramp = ((pc >= sigtramp_start) && (pc < sigtramp_end));
 
-        if (((pc & (sizeof (uintptr_t)-1)) == 0) && (safe_read_ptr(pc, &dummy)))
+        #if MOJOCRASH_PLATFORM_POWERPC || MOJOCRASH_PLATFORM_POWERPC_64
+        if ((pc & (sizeof (uintptr_t)-1)) != 0)
+            break;  /* opcodes must be word-aligned on PPC...corrupt stack. */
+        #endif
+
+        if (!safe_read_ptr(pc, &dummy))
+            break;  /* can't read? Bogus program counter. Give up. */
+
+        if (!isSigtramp)
         {
             if (!isSigtramp)
             {
