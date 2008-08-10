@@ -190,6 +190,8 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
         if (!cb(path, addr, len))
             return 0;  /* stop! */
     } /* for */
+
+    return 1;
 } /* MOJOCRASH_platform_get_objects */
 
 
