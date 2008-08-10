@@ -71,11 +71,11 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
     #error Unhandled CPU arch.
     #endif
 
-    uintptr_t sp = 0;
-    uintptr_t pc = 0;
+    uintptr_t fp = 0;  /* frame pointer. */
+    uintptr_t pc = 0;  /* program counter. */
     uintptr_t lower_bound = 0;
 
-    sp = (uintptr_t) __builtin_frame_address(1);
+    fp = (uintptr_t) __builtin_frame_address(1);
     pc = (uintptr_t) __builtin_return_address(0);
 
     /* MoreBacktrace checks for system calls here, but we don't bother. */
@@ -102,23 +102,23 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
          * !!! FIXME: ABI guides for all 4 CPUs say the frame pointer should
          * !!! FIXME:  be aligned to 16 bytes, not pointer size. Check this!
          */
-        if ((sp == 0) || (sp & (sizeof (uintptr_t)-1)) || (sp <= lower_bound))
+        if ((fp == 0) || (fp & (sizeof (uintptr_t)-1)) || (fp <= lower_bound))
             break;  /* Bogus frame pointer. Give up. */
 
         if (isSigtramp) /* the dreaded _sigtramp()! Have to adjust frame. */
-            sp += sigtramp_frame_offset;
+            fp += sigtramp_frame_offset;
 
         /* get the next stack frame (zero bytes into current stack frame). */
-        if (!safe_read_ptr(sp, &nextFrame))
+        if (!safe_read_ptr(fp, &nextFrame))
             break;  /* Can't read? Bogus frame pointer. Give up. */
 
         /* get the stored Linkage Area value. */
         if (!safe_read_ptr(nextFrame + linkage_offset), &nextPC))
             break;  /* Can't read? Bogus frame pointer. Give up. */
 
-        lower_bound = sp;
+        lower_bound = fp;
         pc = nextPC;
-        sp = nextFrame;
+        fp = nextFrame;
     } /* while */
 } /* walk_macosx_stack */
 
