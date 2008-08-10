@@ -283,9 +283,12 @@ int MOJOCRASH_platform_init(void)
             sigtramp_len = 0x50;
         #elif MOJOCRASH_PLATFORM_X86_64
             sigtramp_frame_offset = 0; /* !!! FIXME */
-            sigtramp_len = 0;  /* !!! FIXME */
+            sigtramp_len = 0x30;
             return 0;  /* !!! FIXME */
-        #else  /* x86 backtrace() works in 10.5.0. */
+        #elif MOJOCRASH_PLATFORM_X86
+            sigtramp_frame_offset = 0x80;
+            sigtramp_len = 0x44;
+        #else
             must_have_backtrace = 1;  /* hopefully we have it! */
         #endif
     } /* else if */
