@@ -235,8 +235,8 @@ int MOJOCRASH_platform_init(void)
             sigtramp_frame_offset = 0xFC;
             sigtramp_len = 0x248;
         #elif MOJOCRASH_PLATFORM_POWERPC_64
-            sigtramp_frame_offset = 0;
-            sigtramp_len = 0;  /* !!! FIXME */
+            sigtramp_frame_offset = 0;  /* !!! FIXME */
+            sigtramp_len = 0x27c;
             return 0;  /* !!! FIXME */
         #elif MOJOCRASH_PLATFORM_X86_64
             sigtramp_frame_offset = 0; /* !!! FIXME */
@@ -253,6 +253,7 @@ int MOJOCRASH_platform_init(void)
 
     else if (ver & 0xFFF0) == 0x1050)  /* 10.5.x? ("Leopard") */
     {
+        /* PowerPC32/64 have backtrace(), but it fails in signal handlers. */
         #if MOJOCRASH_PLATFORM_POWERPC
             sigtramp_frame_offset = 0x9C;
             sigtramp_len = 0x50;
