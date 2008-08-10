@@ -98,6 +98,10 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
         else if (!cb((void *) pc))
             break;  /* stop here. */
 
+        /*
+         * !!! FIXME: ABI guides for all 4 CPUs say the frame pointer should
+         * !!! FIXME:  be aligned to 16 bytes, not pointer size. Check this!
+         */
         if ((sp == 0) || (sp & (sizeof (uintptr_t)-1)) || (sp <= lower_bound))
             break;  /* Bogus frame pointer. Give up. */
 
