@@ -113,7 +113,7 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
             break;  /* Can't read? Bogus frame pointer. Give up. */
 
         /* get the stored Linkage Area value. */
-        if (!safe_read_ptr(nextFrame + linkage_offset), &nextPC))
+        if (!safe_read_ptr(nextFrame + linkage_offset, &nextPC))
             break;  /* Can't read? Bogus frame pointer. Give up. */
 
         lower_bound = fp;
