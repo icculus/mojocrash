@@ -62,10 +62,11 @@ static inline int safe_read_ptr(const uintptr_t src, uintptr_t *dst)
 
 static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
 {
+    /* offset of caller's address in linkage area, from base of stack frame. */
     #if MOJOCRASH_PLATFORM_POWERPC || MOJOCRASH_PLATFORM_POWERPC_64
-    const uintptr_t lr_offset = sizeof (void*) * 2; /* two ptrs above frame. */
+    const uintptr_t linkage_offset = sizeof (uintptr_t) * 2;  /* 2 pointers. */
     #elif MOJOCRASH_PLATFORM_X86 || MOJOCRASH_PLATFORM_X86_64
-    const uintptr_t lr_offset = sizeof (void*);  /* one ptr above frame. */
+    const uintptr_t linkage_offset = sizeof (uintptr_t);  /* one pointer. */
     #else
     #error Unhandled CPU arch.
     #endif
@@ -113,8 +114,8 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
         if (!safe_read_ptr(sp, &nextFrame))
             break;  /* Can't read? Bogus frame pointer. Give up. */
 
-        /* get the stored Link Register value. */
-        if (!safe_read_ptr(nextFrame + lr_offset), &nextPC))
+        /* get the stored Linkage Area value. */
+        if (!safe_read_ptr(nextFrame + linkage_offset), &nextPC))
             break;  /* Can't read? Bogus frame pointer. Give up. */
 
         lower_bound = sp;
