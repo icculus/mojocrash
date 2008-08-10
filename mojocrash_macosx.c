@@ -85,7 +85,7 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
         if ((sp == 0) || (sp & (sizeof (uintptr_t)-1)) || (sp <= lower_bound))
             break;  /* Bogus frame pointer. Give up. */
 
-        if (isSigtramp) /* the dreaded _sigtramp! Have to skip past it. */
+        if (isSigtramp) /* the dreaded _sigtramp()! Have to skip past it. */
             sp += sigtramp_frame_offset;
 
         /* get the next stack frame (zero bytes into current stack frame). */
