@@ -212,7 +212,7 @@ int MOJOCRASH_platform_init(void)
 
     if (ver < 0x1030)
     {
-        major = ((ver & 0xFF) >> 8);
+        major = ((ver & 0xFF00) >> 8);
         major = (((major / 16) * 10) + (major % 16));
         minor = ((ver & 0xF0) >> 4);
         patch = (ver & 0xF);
