@@ -328,3 +328,5 @@ int MOJOCRASH_unix_init(void)
 
 #endif /* MOJOCRASH_PLATFORM_MACOSX */
 
+/* end of mojocrash_macosx.c ... */
+

@@ -181,3 +181,5 @@ int MOJOCRASH_platform_init(void)
 
 #endif /* MOJOCRASH_PLATFORM_UNIX */
 
+/* end of mojocrash_unix.c ... */
+
