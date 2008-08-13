@@ -12,10 +12,10 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #include "mojocrash_internal.h"
 
-static char logpath[PATH_MAX+1];
 static char osversion[64];
 static int crashlogfd = -1;
 static struct timeval starttime;
@@ -49,13 +49,49 @@ void MOJOCRASH_platform_die(int force)
 } /* MOJOCRASH_platform_die */
 
 
+static int build_dirs(char *path)
+{
+    int rc = 0;
+    char *ptr = path;
+    if (*ptr == '/')
+        ptr++;
+
+    while (1)
+    {
+        const char ch = *ptr;
+        if ((ch == '/') || (ch == '\0'))
+        {
+            *ptr = '\0';
+            rc = mkdir(path, S_IRWXU);
+            *ptr = ch;
+            if ((rc == -1) && (errno != EEXIST))
+                return 0;
+        } /* if */
+
+        if (ch == '\0')
+            break;
+
+        ptr++;
+    } /* while */
+
+    return 1;
+} /* build_dirs */
+
+
 int MOJOCRASH_platform_start_crashlog(const char *appname)
 {
-    char *path1 = logpath + strlen(logpath);
-    char *path2 = path1 + 1 + strlen(appname);
+    char logpath[PATH_MAX+1];
+    char *sep = NULL;
+    int len = 0;
     int num = 0;
 
-    strcpy(path1 + 1, appname);
+    MOJOCRASH_unix_get_logpath(logpath, sizeof (logpath), appname);
+    len = strlen(logpath);
+    if (len > (sizeof (logpath) - 16))
+        return 0;
+    sep = &logpath[len];
+    *sep = '/';
+    sep++;
 
     /*
      * if crashlog isn't -1, we might be in a double-fault, but it might be
@@ -81,12 +117,8 @@ int MOJOCRASH_platform_start_crashlog(const char *appname)
          *  remove the storage dir at any time as it cleans up after emptying
          *  out old reports, so try to (re)create it on each iteration.
          */
-        *path1 = *path2 = '\0';
-        mkdir(logpath, 0700);
-        *path1 = '/';
-        mkdir(logpath, 0700);
-        *path2 = '/';
-        snprintf(path2 + 1, sizeof (logpath) - (path2-logpath), "%d", num);
+        build_dirs(logpath);
+        snprintf(sep, sizeof (logpath) - len, "%d", num);
         crashlogfd = open(logpath, O_WRONLY | O_CREAT | O_EXCL, 0600);
         num++;
     } /* while */
@@ -140,21 +172,10 @@ long MOJOCRASH_platform_now(void)
 } /* MOJOCRASH_platform_now */
 
 
-int MOJOCRASH_unix_init(const char *_logpath, const char *_osversion)
+int MOJOCRASH_platform_init(void)
 {
-    int len = 0;
-
     gettimeofday(&starttime, NULL);
-
-    len = snprintf(osversion, sizeof (osversion), "%s", _osversion);
-    if (len >= sizeof (osversion))
-        return 0;
-
-    len = snprintf(logpath, sizeof (logpath), "%s", _logpath);
-    if (len >= sizeof (logpath) - 16)
-        return 0;
-
-    return 1;
+    return MOJOCRASH_unix_init();
 } /* MOJOCRASH_platform_init */
 
 

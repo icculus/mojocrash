@@ -86,35 +86,32 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
 } /* MOJOCRASH_platform_get_objects */
 
 
-int MOJOCRASH_platform_init(void)
+void MOJOCRASH_unix_get_logpath(char *buf, const size_t buflen,
+                                const char *appname)
 {
-    char logpath[PATH_MAX+1];
-    char osversion[64];
-    struct utsname un;
-    const char *homedir = NULL;
-    ssize_t rc = 0;
-    int len = 0;
+    const char *homedir = getenv("HOME");
+    if (homedir == NULL)
+        homedir = ".";  /* !!! FIXME: read /etc/passwd? */
+    snprintf(buf, buflen, "%s/.mojocrash/%s", homedir, appname);
+} /* MOJOCRASH_unix_get_logpath */
 
-    rc = readlink("/proc/self/exe", exename, sizeof (exename) - 1);
+
+void MOJOCRASH_unix_get_osver(char *buf, const size_t buflen)
+{
+    struct utsname un;
+    snprintf(buf, buflen, "%s", (uname(&un) == 0) ? un.release : "???");
+} /* MOJOCRASH_unix_get_osver */
+
+
+int MOJOCRASH_unix_init(void)
+{
+    ssize_t rc = readlink("/proc/self/exe", exename, sizeof (exename) - 1);
     if (rc == -1)
         return 0;
     exename[rc] = '\0';
 
-    homedir = getenv("HOME");
-    if (homedir == NULL)
-        homedir = ".";  /* !!! FIXME: read /etc/passwd? */
-
-    len = snprintf(logpath, sizeof (logpath), "%s/.mojocrash_logs", homedir);
-    if (len >= sizeof (logpath) - 16)
-        return 0;
-
-    if (uname(&un) == 0)
-        snprintf(osversion, sizeof (osversion), "%s", un.release);
-    else
-        strcpy(osversion, "???");
-
-    return MOJOCRASH_unix_init(logpath, osversion);
-} /* MOJOCRASH_platform_init */
+    return 1;
+} /* MOJOCRASH_unix_init */
 
 #endif /* MOJOCRASH_PLATFORM_LINUX */
 

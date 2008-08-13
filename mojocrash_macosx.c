@@ -25,6 +25,8 @@ typedef struct segment_command SegmentCommand;
 #error There seems to be a problem.
 #endif
 
+static long macver_major, macver_minor, macver_patch;
+
 /*
  * The stackwalking code was, a lifetime ago, based on MoreBacktrace.c from
  *  Apple's MoreIsBetter examples ... but obviously it's a different beast
@@ -195,39 +197,72 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
 } /* MOJOCRASH_platform_get_objects */
 
 
-int MOJOCRASH_platform_init(void)
+static void lookup_version(void)
 {
-    char logpath[PATH_MAX+1];
-    char osver[64];
-    const char *homedir = NULL;
+    static int looked_up = 0;
     long ver = 0;
-    int len = 0;
-    void *lib = NULL;
-    uintptr_t sigtramp_len = 0;
-    int must_have_backtrace = 0;
-    long major, minor, patch;
+
+    if (looked_up)
+        return;
+    looked_up = 1;
+
+    macver_major = macver_minor = macver_patch = -1;
 
 	if (Gestalt(gestaltSystemVersion, &ver) != noErr)
-        return 0;
+        return;
 
     if (ver < 0x1030)
     {
-        major = ((ver & 0xFF00) >> 8);
-        major = (((major / 16) * 10) + (major % 16));
-        minor = ((ver & 0xF0) >> 4);
-        patch = (ver & 0xF);
+        macver_major = ((ver & 0xFF00) >> 8);
+        macver_major = (((macver_major / 16) * 10) + (macver_major % 16));
+        macver_minor = ((ver & 0xF0) >> 4);
+        macver_patch = (ver & 0xF);
     } /* if */
     else
     {
-    	if (Gestalt(gestaltSystemVersionMajor, &major) != noErr)
-            return 0;
-    	if (Gestalt(gestaltSystemVersionMinor, &minor) != noErr)
-            return 0;
-    	if (Gestalt(gestaltSystemVersionBugFix, &patch) != noErr)
-            return 0;
+    	if (Gestalt(gestaltSystemVersionMajor, &macver_major) != noErr)
+            macver_major = macver_minor = macver_patch = -1;
+    	else if (Gestalt(gestaltSystemVersionMinor, &macver_minor) != noErr)
+            macver_major = macver_minor = macver_patch = -1;
+    	else if (Gestalt(gestaltSystemVersionBugFix, &macver_patch) != noErr)
+            macver_major = macver_minor = macver_patch = -1;
     } /* else */
+} /* lookup_version */
 
-    snprintf(osver, sizeof (osver), "%ld.%ld.%ld", major, minor, patch);
+
+void MOJOCRASH_unix_get_logpath(char *buf, const size_t buflen,
+                                const char *appname)
+{
+    /* !!! FIXME: use Carbon call for this... */
+    const char *homedir = getenv("HOME");
+    if (homedir == NULL)
+        homedir = ".";  /* !!! FIXME: read /etc/passwd? */
+
+    snprintf(buf, buflen, "%s/Library/Application Support/MojoCrash/%s",
+             homedir, appname);
+} /* MOJOCRASH_unix_get_logpath */
+
+
+void MOJOCRASH_unix_get_osver(char *buf, const size_t buflen)
+{
+    lookup_version();
+    if (macver_major <= 0)
+        snprintf(buf, buflen, "???");
+    else
+    {
+        snprintf(buf, buflen, "%ld.%ld.%ld",
+                 macver_major, macver_minor, macver_patch);
+    } /* else */
+} /* MOJOCRASH_unix_get_osver */
+
+
+int MOJOCRASH_unix_init(void)
+{
+    void *lib = NULL;
+    uintptr_t sigtramp_len = 0;
+    int must_have_backtrace = 0;
+
+    lookup_version();
 
     /*
      * If we don't have backtrace (and sometimes when we do!), we need to
@@ -259,14 +294,14 @@ int MOJOCRASH_platform_init(void)
     };
     #undef XX
 
-    if (major != 10)
+    if (macver_major != 10)
         must_have_backtrace = 1;  /* not Mac OS X 10.x? */
-    else if (minor >= STATICARRAYLEN(sigtramps))
+    else if (macver_minor >= STATICARRAYLEN(sigtramps))
         must_have_backtrace = 1;  /* newer Mac OS X than we know about. */
     else
     {
-        sigtramp_frame_offset = sigtramps[minor].offset;
-        sigtramp_len = sigtramps[minor].len;
+        sigtramp_frame_offset = sigtramps[macver_minor].offset;
+        sigtramp_len = sigtramps[macver_minor].len;
         if ((sigtramp_frame_offset == 0) || (sigtramp_len == 0))
             must_have_backtrace = 1;  /* we lack data. */
     } /* else */
@@ -288,19 +323,8 @@ int MOJOCRASH_platform_init(void)
     sigtramp_start = (uintptr_t) dlsym(lib, "_sigtramp");
     sigtramp_end = sigtramp_start + sigtramp_len;
 
-    /* !!! FIXME: use Carbon call for this... */
-    homedir = getenv("HOME");
-    if (homedir == NULL)
-        homedir = ".";  /* !!! FIXME: read /etc/passwd? */
-
-    len = snprintf(logpath, sizeof (logpath),
-                   "%s/Library/Application Support/MojoCrash",
-                   homedir);
-    if (len >= sizeof (logpath) - 16)
-        return 0;
-
-    return MOJOCRASH_unix_init(logpath, osver);
-} /* MOJOCRASH_platform_init */
+    return 1;
+} /* MOJOCRASH_unix_init */
 
 #endif /* MOJOCRASH_PLATFORM_MACOSX */
 
