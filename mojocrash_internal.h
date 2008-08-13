@@ -38,6 +38,18 @@ int MOJOCRASH_StringLength(const char *str);
 #define strcpy(x,y) MOJOCRASH_StringCopy(x,y)
 void MOJOCRASH_StringCopy(char *dst, const char *str);
 
+#ifdef strchr
+#undef strchr
+#endif
+#define strchr(x,y) MOJOCRASH_StringChar(x,y)
+char *MOJOCRASH_StringChar(const char *str, const char ch);
+
+#ifdef strncmp
+#undef strncmp
+#endif
+#define strncmp(x,y,z) MOJOCRASH_StringNCompare(x,y,z)
+int MOJOCRASH_StringNCompare(const char *a, const char *b, const int n);
+
 char *MOJOCRASH_LongToString(long num, char *str);
 char *MOJOCRASH_PtrToString(const void *ptr, char *str);
 

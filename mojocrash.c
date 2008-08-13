@@ -32,6 +32,42 @@ void MOJOCRASH_StringCopy(char *dst, const char *src)
 } /* MOJOCRASH_StringCopy */
 
 
+char *MOJOCRASH_StringChar(const char *str, const char ch)
+{
+    while (1)
+    {
+        const char strch = *str;
+        if (strch == ch)
+            return (char *) str;
+        else if (strch == '\0')
+            return NULL;
+        else
+            str++;
+    } /* while */
+} /* MOJOCRASH_StringChar */
+
+
+int MOJOCRASH_StringNCompare(const char *a, const char *b, const int n)
+{
+    int i;
+    for (i = 0; i < n; i++)
+    {
+        const char ch1 = a[i];
+        const char ch2 = b[i];
+        if (ch1 < ch2)
+            return -1;
+        else if (ch1 > ch2)
+            return 1;
+        else if (ch1 == '\0')
+            return 0;
+
+        /* we're equal and neither string is terminated. Go on. */
+    } /* for */
+        
+    return 0;  /* matched to n chars, without a terminator. */
+} /* MOJOCRASH_StringNCompare */
+
+
 void MOJOCRASH_StringAppend(char **_dst, const char *src, int *avail)
 {
     if (*avail > 0)
