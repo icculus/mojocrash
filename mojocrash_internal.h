@@ -50,6 +50,13 @@ char *MOJOCRASH_StringChar(const char *str, const char ch);
 #define strncmp(x,y,z) MOJOCRASH_StringNCompare(x,y,z)
 int MOJOCRASH_StringNCompare(const char *a, const char *b, const int n);
 
+#ifdef strcmp
+#undef strcmp
+#endif
+#define strcmp(x,y) MOJOCRASH_StringCompare(x,y)
+int MOJOCRASH_StringCompare(const char *a, const char *b);
+
+long MOJOCRASH_StringToLong(const char *str);
 char *MOJOCRASH_LongToString(long num, char *str);
 char *MOJOCRASH_PtrToString(const void *ptr, char *str);
 

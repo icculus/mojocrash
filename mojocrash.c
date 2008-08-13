@@ -68,6 +68,28 @@ int MOJOCRASH_StringNCompare(const char *a, const char *b, const int n)
 } /* MOJOCRASH_StringNCompare */
 
 
+int MOJOCRASH_StringCompare(const char *a, const char *b)
+{
+    while (1)
+    {
+        const char ch1 = *a;
+        const char ch2 = *b;
+        if (ch1 < ch2)
+            return -1;
+        else if (ch1 > ch2)
+            return 1;
+        else if (ch1 == '\0')
+            return 0;
+
+        /* we're equal and neither string is terminated. Go on. */
+        a++;
+        b++;
+    } /* for */
+
+    return -1;  /* shouldn't happen. */
+} /* MOJOCRASH_StringCompare */
+
+
 void MOJOCRASH_StringAppend(char **_dst, const char *src, int *avail)
 {
     if (*avail > 0)
@@ -97,6 +119,40 @@ static char *flipstring(char *strstart, char *str)
 
     return retval;
 } /* flipstring */
+
+
+long MOJOCRASH_StringToLong(const char *str)
+{
+    long retval = 0;
+    long mult = 1;
+    int i = 0;
+
+    while (*str == ' ')
+        str++;
+
+    if (*str == '-')
+    {
+        mult = -1;
+        str++;
+    } /* if */
+
+    while (1)
+    {
+        const char ch = str[i];
+        if ((ch < '0') || (ch > '9'))
+            break;
+        i++;
+    } /* for */
+
+    while (--i >= 0)
+    {
+        const char ch = str[i];
+        retval += ((long) (ch - '0')) * mult;
+        mult *= 10;
+    } /* while */
+
+    return retval;
+} /* MOJOCRASH_StringToLong */
 
 
 char *MOJOCRASH_LongToString(long num, char *str)
