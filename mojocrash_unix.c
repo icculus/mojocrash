@@ -13,6 +13,9 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <dirent.h>
+#include <pthread.h>
+#include <sys/socket.h>
 
 #include "mojocrash_internal.h"
 
@@ -170,6 +173,203 @@ long MOJOCRASH_platform_now(void)
     gettimeofday(&tv, NULL);
     return tv.tv_sec;
 } /* MOJOCRASH_platform_now */
+
+
+static char **loaded_reports = NULL;
+
+const char **MOJOCRASH_platform_load_reports(const char *appname, int *total)
+{
+    char logpath[PATH_MAX+1];
+    char **retval = NULL;
+    int count = 0;
+    DIR *dirp = NULL;
+    struct dirent *dent = NULL;
+
+    MOJOCRASH_unix_get_logpath(logpath, sizeof (logpath), appname);
+    dirp = opendir(logpath);
+    if (dirp == NULL)
+        return NULL;
+
+    while ((dent = readdir(dirp)) != NULL)
+    {
+        char path[PATH_MAX+1];
+        const char *name = dent->d_name;
+        char *data = NULL;
+        char **ptr = NULL;
+        struct stat statbuf;
+        int rc = 0;
+        int io = -1;
+
+        if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0))
+            continue;
+
+        snprintf(path, sizeof (path), "%s/%s", logpath, name);
+        if (stat(path, &statbuf) == -1)
+            continue;
+
+        if (S_ISDIR(statbuf.st_mode))
+            continue;
+
+        ptr = (char **) realloc(retval, sizeof (char *) * (count+1));
+        if (ptr == NULL)
+            continue;
+        retval = ptr;
+
+        ptr = (char **) realloc(loaded_reports, sizeof (char *) * (count+1));
+        if (ptr == NULL)
+            continue;
+        loaded_reports = ptr;
+
+        io = open(path, O_RDONLY);
+        if (io == -1)
+            continue;
+
+        data = (char *) malloc(statbuf.st_size + 1);
+        if (data == NULL)
+        {
+            close(io);
+            continue;
+        } /* if */
+
+        rc = read(io, data, statbuf.st_size);
+        close(io);
+        if (rc != statbuf.st_size)
+        {
+            free(data);
+            continue;
+        } /* if */
+        data[statbuf.st_size] = '\0';
+
+        loaded_reports[count] = (char *) malloc(strlen(path) + 1);
+        if (loaded_reports[count] == NULL)
+        {
+            free(data);
+            continue;
+        } /* if */
+
+        strcpy(loaded_reports[count], path);
+        retval[count] = data;
+        count++;
+    } /* while */
+
+    closedir(dirp);
+
+    if (count == 0)
+    {
+        free(retval);
+        free(loaded_reports);
+        retval = NULL;
+        loaded_reports = NULL;
+    } /* if */
+
+    *total = count;
+    return (const char **) retval;
+} /* MOJOCRASH_platform_load_reports */
+
+
+void MOJOCRASH_platform_delete_report(const char *appname, const int idx)
+{
+    unlink(loaded_reports[idx]);
+} /* MOJOCRASH_platform_delete_report */
+
+
+void MOJOCRASH_platform_free_reports(const char **reports, const int total)
+{
+    int i;
+    for (i = 0; i < total; i++)
+    {
+        free((void *) reports[i]);
+        free(loaded_reports[i]);
+    } /* for */
+
+    free(reports);
+    free(loaded_reports);
+    loaded_reports = NULL;
+} /* MOJOCRASH_platform_free_reports */
+
+
+void *MOJOCRASH_platform_open_socket(const char *host, const int iport)
+{
+    int *sock = (int *) malloc(sizeof (int));
+    if (sock == NULL)
+        return NULL;
+
+/* !!! FIXME */
+free(sock); return NULL;
+} /* MOJOCRASH_platform_open_socket */
+
+
+void MOJOCRASH_platform_close_socket(void *sock)
+{
+    close(*((int *) sock));
+    free(sock);
+} /* MOJOCRASH_platform_close_socket */
+
+
+int MOJOCRASH_platform_read_socket(void *sock, char *buf, const int l)
+{
+    const int fd = *((int *) sock);
+    return (int) recv(fd, buf, l, 0);
+} /* MOJOCRASH_platform_read_socket */
+
+
+int MOJOCRASH_platform_write_socket(void *sock, const char *buf, const int l)
+{
+    const int fd = *((int *) sock);
+    return (int) send(fd, buf, l, 0);
+} /* MOJOCRASH_platform_write_socket */
+
+
+void *MOJOCRASH_platform_create_mutex(void)
+{
+    pthread_mutex_t *mutex = malloc(sizeof (pthread_mutex_t));
+    if ((!mutex) || (pthread_mutex_init(mutex, NULL) != 0))
+    {
+        free(mutex);
+        return NULL;
+    } /* if */
+    return mutex;
+} /* MOJOCRASH_platform_create_mutex */
+
+
+void MOJOCRASH_platform_lock_mutex(void *mutex)
+{
+    pthread_mutex_lock((pthread_mutex_t *) mutex);
+} /* MOJOCRASH_platform_lock_mutex */
+
+
+void MOJOCRASH_platform_unlock_mutex(void *mutex)
+{
+    pthread_mutex_unlock((pthread_mutex_t *) mutex);
+} /* MOJOCRASH_platform_unlock_mutex */
+
+
+void MOJOCRASH_platform_destroy_mutex(void *mutex)
+{
+    pthread_mutex_destroy((pthread_mutex_t *) mutex);
+    free(mutex);
+} /* MOJOCRASH_platform_destroy_mutex */
+
+
+void *MOJOCRASH_platform_spin_thread(void *(*fn)(void *), void *data)
+{
+    pthread_t *thread = malloc(sizeof (pthread_t));
+    if ((!thread) || (pthread_create(thread, NULL, fn, data) != 0))
+    {
+        free(thread);
+        return NULL;
+    } /* if */
+    return thread;
+} /* MOJOCRASH_platform_spin_thread */
+
+
+void *MOJOCRASH_platform_join_thread(void *thread)
+{
+    void *retval = NULL;
+    pthread_join(*((pthread_t *) thread), &retval);
+    free(thread);
+    return retval;
+} /* MOJOCRASH_platform_join_thread */
 
 
 int MOJOCRASH_platform_init(void)

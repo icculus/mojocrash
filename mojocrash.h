@@ -46,6 +46,22 @@ typedef struct MOJOCRASH_hooks
 int MOJOCRASH_install(const char *appname, const char *version,
                       const MOJOCRASH_hooks *hooks);
 
+
+
+typedef struct MOJOCRASH_report_hooks
+{
+    const char **(*load_reports)(const char *appname, int *total);
+    void (*delete_report)(const char *appname, const int idx);
+    void (*free_reports)(const char **reports, const int total);
+    int (*gui_init)(void);
+    int (*gui_show)(const char **reports, const int total);
+    int (*gui_status)(const char *statustext, int percent);
+    void (*gui_quit)(const int success, const char *statustext);
+} MOJOCRASH_report_hooks;
+
+void MOJOCRASH_report(const char *appname, const char *url,
+                      const MOJOCRASH_report_hooks *h);
+
 #ifdef __cplusplus
 }
 #endif
