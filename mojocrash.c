@@ -271,7 +271,7 @@ static int get_basics(int sig)
 static int crash_catcher_internal(int sig, int crash_count)
 {
     if (!hooks.preflight(sig, crash_count)) return 0;
-    if (!hooks.start_crashlog()) return 0;
+    if (!hooks.start_crashlog(appname)) return 0;
     if (!get_basics(sig)) return 0;
     if (!hooks.new_crashlog_line("")) return 0;
     if (!hooks.get_objects(objects_callback)) return 0;
@@ -330,9 +330,9 @@ static int defhook_preflight(int sig, int crash_count)
     return 0;  /* oh well. */
 } /* defhook_preflight */
 
-static int defhook_start_crashlog(void)
+static int defhook_start_crashlog(const char *appname)
 {
-    return MOJOCRASH_platform_start_crashlog();
+    return MOJOCRASH_platform_start_crashlog(appname);
 } /* defhook_start_crashlog */
 
 static int defhook_new_crashlog_line(const char *str)

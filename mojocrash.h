@@ -33,7 +33,7 @@ typedef struct MOJOCRASH_hooks
 {
     int (*install_crash_catcher)(MOJOCRASH_catcher catcher);
     int (*preflight)(int sig, int crash_count);
-    int (*start_crashlog)(void);
+    int (*start_crashlog)(const char *appname);
     int (*new_crashlog_line)(const char *str);
     int (*get_callstack)(MOJOCRASH_get_callstack_callback callback);
     int (*get_objects)(MOJOCRASH_get_objects_callback callback);

@@ -57,7 +57,7 @@ int MOJOCRASH_platform_init(void);
 int MOJOCRASH_platform_install_crash_catcher(MOJOCRASH_catcher catcher);
 int MOJOCRASH_platform_get_callstack(MOJOCRASH_get_callstack_callback cb);
 int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb);
-int MOJOCRASH_platform_start_crashlog(void);
+int MOJOCRASH_platform_start_crashlog(const char *appname);
 int MOJOCRASH_platform_new_crashlog_line(const char *str);
 int MOJOCRASH_platform_end_crashlog(void);
 void MOJOCRASH_platform_die(int force);
