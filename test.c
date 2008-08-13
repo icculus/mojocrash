@@ -9,7 +9,7 @@ void f1() { f2(); }
 int
 main()
 {
-    if (!MOJOCRASH_install("myapp", "1.0", "http://icculus.org/", NULL))
+    if (!MOJOCRASH_install("myapp", "1.0", NULL))
         printf("failed to install!\n");
     else
         f1();

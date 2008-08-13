@@ -20,7 +20,6 @@ extern "C" {
 #define MOJOCRASH_LOG_FORMAT_VERSION 1
 #define MOJOCRASH_MAX_APPNAME_STRING 64
 #define MOJOCRASH_MAX_VERSION_STRING 32
-#define MOJOCRASH_MAX_URL_STRING 128
 
 
 typedef void (*MOJOCRASH_catcher)(int sig);
@@ -45,7 +44,7 @@ typedef struct MOJOCRASH_hooks
 
 
 int MOJOCRASH_install(const char *appname, const char *version,
-                      const char *url, const MOJOCRASH_hooks *hooks);
+                      const MOJOCRASH_hooks *hooks);
 
 #ifdef __cplusplus
 }

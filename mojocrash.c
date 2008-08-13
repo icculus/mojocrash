@@ -151,7 +151,6 @@ static char scratch[256];
 static char numcvt[32];
 static char appname[MOJOCRASH_MAX_APPNAME_STRING];
 static char version[MOJOCRASH_MAX_VERSION_STRING];
-static char url[MOJOCRASH_MAX_URL_STRING];
 
 
 static int callstack_callback(void *addr)
@@ -426,7 +425,7 @@ static void init_hooks(const MOJOCRASH_hooks *h)
 /* Entry point(s) ... */
 
 int MOJOCRASH_install(const char *_appname, const char *_version,
-                      const char *_url, const MOJOCRASH_hooks *_hooks)
+                      const MOJOCRASH_hooks *_hooks)
 {
     if (installed)
         return 0;  /* don't double-call this! */
@@ -434,15 +433,12 @@ int MOJOCRASH_install(const char *_appname, const char *_version,
     /* sanity-check parameters. */
     if (_appname == NULL) return 0;
     if (_version == NULL) return 0;
-    if (_url == NULL) return 0;
     if (strlen(_appname) >= MOJOCRASH_MAX_APPNAME_STRING) return 0;
     if (strlen(_version) >= MOJOCRASH_MAX_VERSION_STRING) return 0;
-    if (strlen(_url) >= MOJOCRASH_MAX_URL_STRING) return 0;
 
     /* set up state. */
     strcpy(appname, _appname);
     strcpy(version, _version);
-    strcpy(url, _url);
     init_hooks(_hooks);
 
     if (!MOJOCRASH_platform_init())
