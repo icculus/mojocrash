@@ -98,6 +98,7 @@ int MOJOCRASH_platform_start_crashlog(const char *appname)
     sep = &logpath[len];
     *sep = '/';
     sep++;
+    *sep = '\0';
 
     /*
      * if crashlog isn't -1, we might be in a double-fault, but it might be
