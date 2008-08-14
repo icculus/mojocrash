@@ -90,7 +90,7 @@ int MOJOCRASH_StringCompare(const char *a, const char *b)
 } /* MOJOCRASH_StringCompare */
 
 
-void MOJOCRASH_StringAppend(char **_dst, const char *src, int *avail)
+void MOJOCRASH_StringAppend(char **_dst, int *avail, const char *src)
 {
     if (*avail > 0)
     {
@@ -213,8 +213,8 @@ static int callstack_callback(void *addr)
 {
     char *str = scratch;
     int avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "CALLSTACK ", &avail);
-    MOJOCRASH_StringAppend(&str, MOJOCRASH_PtrToString(addr, numcvt), &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "CALLSTACK ");
+    MOJOCRASH_StringAppend(&str, &avail, MOJOCRASH_PtrToString(addr, numcvt));
     return hooks.new_crashlog_line(scratch);
 } /* callstack_callback */
 
@@ -223,12 +223,13 @@ static int objects_callback(const char *fname, const void *addr,
 {
     char *str = scratch;
     int avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "OBJECT ", &avail);
-    MOJOCRASH_StringAppend(&str, fname, &avail);
-    MOJOCRASH_StringAppend(&str, "/", &avail);
-    MOJOCRASH_StringAppend(&str, MOJOCRASH_PtrToString(addr, numcvt), &avail);
-    MOJOCRASH_StringAppend(&str, "/", &avail);
-    MOJOCRASH_StringAppend(&str, MOJOCRASH_ULongToString(len, numcvt), &avail);
+    char numcvt[32];
+    MOJOCRASH_StringAppend(&str, &avail, "OBJECT ");
+    MOJOCRASH_StringAppend(&str, &avail, fname);
+    MOJOCRASH_StringAppend(&str, &avail, "/");
+    MOJOCRASH_StringAppend(&str, &avail, MOJOCRASH_PtrToString(addr, numcvt));
+    MOJOCRASH_StringAppend(&str, &avail, "/");
+    MOJOCRASH_StringAppend(&str, &avail, MOJOCRASH_ULongToString(len, numcvt));
     return hooks.new_crashlog_line(scratch);
 } /* objects_callback */
 
@@ -241,20 +242,34 @@ static int etc_callback(const char *key, const char *value)
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "ETC_KEY ", &avail);
-    MOJOCRASH_StringAppend(&str, key, &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "ETC_KEY ");
+    MOJOCRASH_StringAppend(&str, &avail, key);
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "ETC_VALUE ", &avail);
-    MOJOCRASH_StringAppend(&str, value, &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "ETC_VALUE ");
+    MOJOCRASH_StringAppend(&str, &avail, value);
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
     return 1;
 } /* etc_callback */
+
+
+void MOJOCRASH_StringAppendMojoCrashVersion(char **dst, int *avail)
+{
+    char numcvt[32];
+    MOJOCRASH_StringAppend(dst, avail,
+                MOJOCRASH_ULongToString(MOJOCRASH_VERSION_MAJOR, numcvt));
+    MOJOCRASH_StringAppend(dst, avail, ".");
+    MOJOCRASH_StringAppend(dst, avail,
+                MOJOCRASH_ULongToString(MOJOCRASH_VERSION_MINOR, numcvt));
+    MOJOCRASH_StringAppend(dst, avail, ".");
+    MOJOCRASH_StringAppend(dst, avail,
+                MOJOCRASH_ULongToString(MOJOCRASH_VERSION_PATCH, numcvt));
+} /* MOJOCRASH_StringAppendMojoCrashVersion */
 
 
 static int get_basics(int sig)
@@ -280,41 +295,30 @@ static int get_basics(int sig)
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "MOJOCRASH ", &avail);
-    MOJOCRASH_StringAppend(&str,
-                MOJOCRASH_ULongToString(MOJOCRASH_VERSION_MAJOR, numcvt),
-                &avail);
-    MOJOCRASH_StringAppend(&str, ".", &avail);
-    MOJOCRASH_StringAppend(&str,
-                MOJOCRASH_ULongToString(MOJOCRASH_VERSION_MINOR, numcvt),
-                &avail);
-    MOJOCRASH_StringAppend(&str, ".", &avail);
-    MOJOCRASH_StringAppend(&str,
-                MOJOCRASH_ULongToString(MOJOCRASH_VERSION_PATCH, numcvt),
-                &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "MOJOCRASH ");
+    MOJOCRASH_StringAppendMojoCrashVersion(&str, &avail);
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "CRASHLOG_VERSION ", &avail);
-    MOJOCRASH_StringAppend(&str,
-                MOJOCRASH_ULongToString(MOJOCRASH_LOG_FORMAT_VERSION, numcvt),
-                &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "CRASHLOG_VERSION ");
+    MOJOCRASH_StringAppend(&str, &avail,
+                MOJOCRASH_ULongToString(MOJOCRASH_LOG_FORMAT_VERSION, numcvt));
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "APPLICATION_NAME ", &avail);
-    MOJOCRASH_StringAppend(&str, appname, &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "APPLICATION_NAME ");
+    MOJOCRASH_StringAppend(&str, &avail, appname);
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "APPLICATION_VERSION ", &avail);
-    MOJOCRASH_StringAppend(&str, version, &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "APPLICATION_VERSION ");
+    MOJOCRASH_StringAppend(&str, &avail, version);
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
@@ -326,33 +330,31 @@ static int get_basics(int sig)
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "PLATFORM_VERSION ", &avail);
-    MOJOCRASH_StringAppend(&str, MOJOCRASH_platform_version(), &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "PLATFORM_VERSION ");
+    MOJOCRASH_StringAppend(&str, &avail, MOJOCRASH_platform_version());
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "CRASH_SIGNAL ", &avail);
-    MOJOCRASH_StringAppend(&str, MOJOCRASH_LongToString(sig, numcvt), &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "CRASH_SIGNAL ");
+    MOJOCRASH_StringAppend(&str, &avail, MOJOCRASH_LongToString(sig, numcvt));
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "APPLICATION_UPTIME ", &avail);
-    MOJOCRASH_StringAppend(&str,
-                MOJOCRASH_LongToString(MOJOCRASH_platform_appuptime(), numcvt),
-                &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "APPLICATION_UPTIME ");
+    MOJOCRASH_StringAppend(&str, &avail,
+                MOJOCRASH_LongToString(MOJOCRASH_platform_appuptime(), numcvt));
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 
     str = scratch;
     avail = sizeof (scratch);
-    MOJOCRASH_StringAppend(&str, "CRASH_TIME ", &avail);
-    MOJOCRASH_StringAppend(&str,
-                MOJOCRASH_LongToString(MOJOCRASH_platform_now(), numcvt),
-                &avail);
+    MOJOCRASH_StringAppend(&str, &avail, "CRASH_TIME ");
+    MOJOCRASH_StringAppend(&str, &avail,
+                MOJOCRASH_LongToString(MOJOCRASH_platform_now(), numcvt));
     if (!hooks.new_crashlog_line(scratch))
         return 0;
 

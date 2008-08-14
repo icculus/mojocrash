@@ -56,6 +56,10 @@ int MOJOCRASH_StringNCompare(const char *a, const char *b, const int n);
 #define strcmp(x,y) MOJOCRASH_StringCompare(x,y)
 int MOJOCRASH_StringCompare(const char *a, const char *b);
 
+/* this is NOT a drop in replacement for strcat. */
+void MOJOCRASH_StringAppend(char **_dst, int *avail, const char *src);
+void MOJOCRASH_StringAppendMojoCrashVersion(char **dst, int *avail);
+
 long MOJOCRASH_StringToLong(const char *str);
 char *MOJOCRASH_LongToString(long num, char *str);
 char *MOJOCRASH_PtrToString(const void *ptr, char *str);
