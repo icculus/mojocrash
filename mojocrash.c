@@ -238,8 +238,6 @@ static int etc_callback(const char *key, const char *value)
     char *str = NULL;
     int avail = 0;
 
-    /* !!! FIXME: escape newlines in keys and values? */
-
     str = scratch;
     avail = sizeof (scratch);
     MOJOCRASH_StringAppend(&str, &avail, "ETC_KEY ");
