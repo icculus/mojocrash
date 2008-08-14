@@ -427,6 +427,9 @@ void *MOJOCRASH_platform_open_socket(void *_dns)
 
     for (addr = dns->addr; addr != NULL; addr = addr->ai_next)
     {
+        if (addr->ai_socktype != SOCK_STREAM)
+            continue;
+
         if (fd != -1)
             close(fd);
 
