@@ -15,7 +15,10 @@
 #include <errno.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
 #include "mojocrash_internal.h"
 
@@ -288,15 +291,192 @@ void MOJOCRASH_platform_free_reports(const char **reports, const int total)
 } /* MOJOCRASH_platform_free_reports */
 
 
-void *MOJOCRASH_platform_open_socket(const char *host, const int iport)
+typedef struct DnsResolve
 {
-    int *sock = (int *) malloc(sizeof (int));
-    if (sock == NULL)
+    char *host;
+    int port;
+    pthread_mutex_t mutex;
+    struct addrinfo *addr;
+    volatile int status;
+    volatile int app_done;
+} DnsResolve;
+
+
+static void free_dns(DnsResolve *dns)
+{
+    pthread_mutex_destroy(&dns->mutex);
+    if (dns->addr != NULL)
+        freeaddrinfo(dns->addr);
+    free(dns->host);
+    free(dns);
+} /* free_dns */
+
+
+static void *dns_resolver_thread(void *_dns)
+{
+    char portstr[64];
+    int app_done = 0;
+    DnsResolve *dns = (DnsResolve *) _dns;
+    int rc;
+
+    MOJOCRASH_LongToString(dns->port, portstr);
+
+    /* this blocks, hence all the thread tapdancing. */
+    rc = getaddrinfo(dns->host, portstr, NULL, &dns->addr);
+
+    pthread_mutex_lock(&dns->mutex);
+    dns->status = (rc == 0) ? 1 : -1;
+    app_done = dns->app_done;
+    pthread_mutex_unlock(&dns->mutex);
+
+    /* we free if the app is done, otherwise, app will do it. */
+    if (app_done)
+        free_dns(dns);
+
+    return NULL;  /* we're detached anyhow. */
+} /* dns_resolve */
+
+
+void *MOJOCRASH_platform_begin_dns(const char *host, const int port)
+{
+    DnsResolve *retval = NULL;
+    int mutex_initted = 0;
+    pthread_t thread;
+
+    retval = (DnsResolve *) malloc(sizeof (DnsResolve));
+    if (retval == NULL)
+        goto begin_dns_failed;
+
+    retval->host = (char *) malloc(strlen(host) + 1);
+    if (retval->host == NULL)
+        goto begin_dns_failed;
+
+    if (pthread_mutex_init(&retval->mutex, NULL) != 0)
+        goto begin_dns_failed;
+
+    mutex_initted = 1;
+    strcpy(retval->host, host);
+    retval->port = port;
+    retval->addr = NULL;
+    retval->status = 0;
+    retval->app_done = 0;
+
+    if (pthread_create(&thread, NULL, dns_resolver_thread, retval) != 0)
+        goto begin_dns_failed;
+    pthread_detach(thread);
+
+    return retval;
+
+begin_dns_failed:
+    if (retval != NULL)
+    {
+        if (mutex_initted)
+            pthread_mutex_destroy(&retval->mutex);
+        free(retval->host);
+        free(retval);
+    } /* if */
+    return NULL;
+} /* MOJOCRASH_platform_begin_dns */
+
+
+int MOJOCRASH_platform_check_dns(void *_dns)
+{
+    DnsResolve *dns = (DnsResolve *) _dns;
+    int retval;
+    pthread_mutex_lock(&dns->mutex);
+    retval = dns->status;
+    pthread_mutex_unlock(&dns->mutex);
+    return retval;
+} /* MOJOCRASH_platform_check_dns */
+
+
+void MOJOCRASH_platform_free_dns(void *_dns)
+{
+    int thread_done = 0;
+    DnsResolve *dns = (DnsResolve *) _dns;
+    if (dns == NULL)
+        return;
+
+    pthread_mutex_lock(&dns->mutex);
+    dns->app_done = 1;
+    thread_done = (dns->status != 0);
+    pthread_mutex_unlock(&dns->mutex);
+
+    /* we free if the thread is done, otherwise, thread will do it. */
+    if (thread_done)
+        free_dns(dns);
+} /* MOJOCRASH_platform_free_dns */
+
+
+void *MOJOCRASH_platform_open_socket(void *_dns)
+{
+    DnsResolve *dns = (DnsResolve *) _dns;
+    const struct addrinfo *addr = NULL;
+    int *retval = NULL;
+    int flags = 0;
+    int fd = -1;
+    int success = 0;
+
+    if (MOJOCRASH_platform_check_dns(dns) != 1)
+        return NULL;  /* dns resolve isn't done or it failed. */
+
+    retval = (int *) malloc(sizeof (int));
+    if (retval == NULL)
         return NULL;
 
-/* !!! FIXME */
-free(sock); return NULL;
+    for (addr = dns->addr; addr != NULL; addr = addr->ai_next)
+    {
+        if (fd != -1)
+            close(fd);
+
+        fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+
+        if (fd == -1)
+            continue;
+        else if ((flags = fcntl(fd, F_GETFL, 0)) < 0)
+            continue;
+        else if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+            continue;
+        else if (connect(fd, addr->ai_addr, addr->ai_addrlen) == -1)
+        {
+            if (errno != EINPROGRESS)
+                continue;
+        } /* if */
+
+        success = 1;
+        break;
+    } /* for */
+
+    if (success)
+        *retval = fd;
+    else
+    {
+        if (fd != -1)
+            close(fd);
+        free(retval);
+        retval = NULL;
+    } /* else */
+
+    return retval;
 } /* MOJOCRASH_platform_open_socket */
+
+
+int MOJOCRASH_platform_check_socket(void *sock)
+{
+    const int fd = *((int *) sock);
+    fd_set wfds;
+    struct timeval tv;
+    int retval;
+
+    /* one handle, no wait. */
+    FD_ZERO(&wfds);
+    FD_SET(fd, &wfds);
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+
+    retval = select(fd+1, NULL, &wfds, NULL, &tv);
+    return ((retval > 0) && (FD_ISSET(fd, &wfds) != 0));
+} /* MOJOCRASH_platform_check_socket */
 
 
 void MOJOCRASH_platform_close_socket(void *sock)
@@ -309,67 +489,21 @@ void MOJOCRASH_platform_close_socket(void *sock)
 int MOJOCRASH_platform_read_socket(void *sock, char *buf, const int l)
 {
     const int fd = *((int *) sock);
-    return (int) recv(fd, buf, l, 0);
+    const int retval = (int) recv(fd, buf, l, 0);
+    if (retval < 0)
+        return (errno == EAGAIN) ? -2 : -1;
+    return retval;
 } /* MOJOCRASH_platform_read_socket */
 
 
 int MOJOCRASH_platform_write_socket(void *sock, const char *buf, const int l)
 {
     const int fd = *((int *) sock);
-    return (int) send(fd, buf, l, 0);
-} /* MOJOCRASH_platform_write_socket */
-
-
-void *MOJOCRASH_platform_create_mutex(void)
-{
-    pthread_mutex_t *mutex = malloc(sizeof (pthread_mutex_t));
-    if ((!mutex) || (pthread_mutex_init(mutex, NULL) != 0))
-    {
-        free(mutex);
-        return NULL;
-    } /* if */
-    return mutex;
-} /* MOJOCRASH_platform_create_mutex */
-
-
-void MOJOCRASH_platform_lock_mutex(void *mutex)
-{
-    pthread_mutex_lock((pthread_mutex_t *) mutex);
-} /* MOJOCRASH_platform_lock_mutex */
-
-
-void MOJOCRASH_platform_unlock_mutex(void *mutex)
-{
-    pthread_mutex_unlock((pthread_mutex_t *) mutex);
-} /* MOJOCRASH_platform_unlock_mutex */
-
-
-void MOJOCRASH_platform_destroy_mutex(void *mutex)
-{
-    pthread_mutex_destroy((pthread_mutex_t *) mutex);
-    free(mutex);
-} /* MOJOCRASH_platform_destroy_mutex */
-
-
-void *MOJOCRASH_platform_spin_thread(void *(*fn)(void *), void *data)
-{
-    pthread_t *thread = malloc(sizeof (pthread_t));
-    if ((!thread) || (pthread_create(thread, NULL, fn, data) != 0))
-    {
-        free(thread);
-        return NULL;
-    } /* if */
-    return thread;
-} /* MOJOCRASH_platform_spin_thread */
-
-
-void *MOJOCRASH_platform_join_thread(void *thread)
-{
-    void *retval = NULL;
-    pthread_join(*((pthread_t *) thread), &retval);
-    free(thread);
+    const int retval = (int) send(fd, buf, l, 0);
+    if (retval < 0)
+        return (errno == EAGAIN) ? -2 : -1;
     return retval;
-} /* MOJOCRASH_platform_join_thread */
+} /* MOJOCRASH_platform_write_socket */
 
 
 int MOJOCRASH_platform_init(void)

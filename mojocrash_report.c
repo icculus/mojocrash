@@ -4,18 +4,31 @@
 typedef struct
 {
     int done;
-    char status[128];
+    const char *status;
     int percent;
     const MOJOCRASH_report_hooks *h;
+    int port;
     const char *app;
     const char **reports;
     int total;
     const char *url;
-    void *mutex;
+    void *socket;
+    void *resolved;
 } SendReportData;
 
-static volatile SendReportData send_data;
 
+static void set_send_status(SendReportData *data, const char *status,
+                            const int percent, const int done)
+{
+    if (!data->done)
+    {
+        data->done = done;
+        data->status = status;
+        data->percent = percent;
+    } /* if */
+
+    data->h->gui_status(data->status, data->percent);
+} /* set_send_status */
 
 
 static int split_url(char *url, char **prot, char **user, char **pass,
@@ -74,9 +87,8 @@ static int split_url(char *url, char **prot, char **user, char **pass,
 } /* split_url */
 
 
-static void *server_connect(const MOJOCRASH_report_hooks *h, const char *_url)
+static int resolve_server_address(SendReportData *data)
 {
-    /* !!! FIXME: proxies? */
     char url[256];
     char *prot = NULL;
     char *user = NULL;
@@ -84,35 +96,95 @@ static void *server_connect(const MOJOCRASH_report_hooks *h, const char *_url)
     char *host = NULL;
     char *port = NULL;
     char *path = NULL;
-    int iport = 80;
-    void *sock = NULL;
 
-    if (strlen(_url) > sizeof (url))
-        return NULL;
+    if (data->resolved != NULL)
+        return 1;  /* already done. */
 
-    strcpy(url, _url);
+    if (strlen(data->url) >= sizeof (url))
+    {
+        set_send_status(data, "BUG: URL buffer is too small.", 100, -1);
+        return 0;
+    } /* if */
+
+    strcpy(url, data->url);
     if (!split_url(url, &prot, &user, &pass, &host, &port, &path))
-        return NULL;
+    {
+        set_send_status(data, "BUG: Invalid URL.", 100, -1);
+        return 0;
+    } /* if */
 
     if ((prot == NULL) || (strcmp(prot, "http") != 0))
-        return NULL;
+    {
+        set_send_status(data, "BUG: Unsupported protocol.", 100, -1);
+        return 0;
+    } /* if */
 
-    if ((user != NULL) || (pass != NULL)) return NULL;  /* !!! FIXME */
-
-    if (host == NULL)
-        return NULL;
-
-    if (path == NULL)
-        return NULL;
+    if ((user != NULL) || (pass != NULL))
+    {
+        set_send_status(data, "BUG: auth unsupported.", 100, -1);
+        return 0;
+    } /* if */
 
     if (port != NULL)
-        iport = (int) MOJOCRASH_StringToLong(port);
+        data->port = (int) MOJOCRASH_StringToLong(port);
+    else
+        data->port = 80;
 
-    sock = MOJOCRASH_platform_open_socket(host, iport);
-    if (sock == NULL)
-        return NULL;
+    data->resolved = MOJOCRASH_platform_begin_dns(host, data->port);
+    while (1)
+    {
+        set_send_status(data, "Looking up hostname...", -1, 0);
+        const int rc = MOJOCRASH_platform_check_dns(data->resolved);
+        if (rc == 1)  /* done! */
+            break;
+        else if (rc == -1)  /* failed. */
+        {
+            MOJOCRASH_platform_free_dns(data->resolved);
+            data->resolved = NULL;
+            break;
+        } /* else if */
+    } /* while */
 
-    return sock;
+    if (data->resolved == NULL)
+    {
+        set_send_status(data, "Hostname lookup failed.", 100, -1);
+        return 0;
+    } /* if */
+
+    return 1;
+} /* resolve_server_address */
+
+
+static int server_connect(SendReportData *data)
+{
+    /* !!! FIXME: proxies? */
+
+    if (!resolve_server_address(data))
+        return 0;
+
+    data->socket = MOJOCRASH_platform_open_socket(data->resolved);
+    while (1)
+    {
+        int rc;
+        set_send_status(data, "Connecting...", data->percent, 0);
+        rc = MOJOCRASH_platform_check_socket(data->socket);
+        if (rc == 1)  /* done! */
+            break;
+        else if (rc == -1)  /* failed. */
+        {
+            MOJOCRASH_platform_close_socket(data->socket);
+            data->socket = NULL;
+            break;
+        } /* else if */
+    } /* while */
+
+    if (data->socket == NULL)
+    {
+        set_send_status(data, "Connection failed.", 100, -1);
+        return 0;
+    } /* if */
+
+    return 1;
 } /* server_connect */
 
 
@@ -122,94 +194,72 @@ static inline int percent(const int x, const int total)
 } /* percent */
 
 
-static inline void set_send_status(const char *status, const int percent,
-                                   const int done)
+static void send_all_reports(SendReportData *data)
 {
-    MOJOCRASH_platform_lock_mutex(send_data.mutex);
-    if (!send_data.done)
-    {
-        send_data.done = done;
-        strcpy((char *) send_data.status, status);
-        send_data.percent = percent;
-    } /* if */
-    MOJOCRASH_platform_unlock_mutex(send_data.mutex);
-} /* set_send_status */
-
-
-static inline void spin(void)
-{
-    MOJOCRASH_platform_lock_mutex(send_data.mutex);
-    MOJOCRASH_platform_unlock_mutex(send_data.mutex);
-} /* spin */
-
-
-static void *send_all_reports(void *unused)
-{
-    const MOJOCRASH_report_hooks *h = send_data.h;
-    const char *app = send_data.app;
-    const char **reports = send_data.reports;
-    const int total = send_data.total;
-    const char *url = send_data.url;
     int i, j;
     int bytesout = 0;
     int bytesin = 0;
 
-    (void) unused;  /* laziness wins: using a global. */
-
-    for (i = 0; i < total; i++)
-        bytesin += strlen(reports[i]);
-
-    for (i = 0; (i < total) && (!send_data.done); i++)
+    for (i = 0; i < data->total; i++)
     {
-        const char *report = reports[i];
+        set_send_status(data, "Starting up...", -1, 0);
+        bytesin += strlen(data->reports[i]);
+    } /* for */
+
+    for (i = 0; (i < data->total) && (!data->done); i++)
+    {
+        const char *report = data->reports[i];
         const int len = strlen(report);
-        void *sock = NULL;
         int bw = 0;
         int rc = 0;
 
         if (len == 0)   /* nothing to do? */
         {
-            h->delete_report(app, i);
+            data->h->delete_report(data->app, i);
             continue;
         } /* if */
 
         /* !!! FIXME: pipelining? */
-        set_send_status("Connecting...", -1, 0);
-        sock = server_connect(h, url);
-        if (sock == NULL)
-        {
-            set_send_status("Connection failed.", 100, -1);
-            break;
-        } /* if */
+        if (!server_connect(data))
+            break;  /* error message was set elsewhere. */
 
-        while ((rc >= 0) && (bw < len) && (!send_data.done))
+        while ((bw < len) && (!data->done))
         {
-            set_send_status("Sending...", percent(bytesout, bytesin), 0);
-            rc = MOJOCRASH_platform_write_socket(sock, report + bw, len - bw);
-            if (rc > 0)
+            set_send_status(data, "Sending...", percent(bytesout, bytesin), 0);
+            rc = MOJOCRASH_platform_write_socket(data->socket, report + bw,
+                                                 len - bw);
+            if (rc == -1)
+                set_send_status(data, "Network write failure.", 100, -1);
+            else if (rc == 0)
+                set_send_status(data, "Connection lost.", 100, -1);
+            else if (rc > 0)
             {
                 bw += rc;
                 bytesout += rc;
             } /* if */
         } /* while */
 
-        if (rc >= 0)  /* entire message was sent? */
+        if (!data->done)  /* entire message was sent? */
         {
             int found = 0;
             int br = 0;
             char buf[256];
 
-            set_send_status("Getting reply...", percent(bytesout, bytesin), 0);
-            while ((!found) && (!send_data.done))
+            while ((!found) && (!data->done))
             {
-                rc = MOJOCRASH_platform_read_socket(sock, buf + br,
+                set_send_status(data, "Getting reply...", data->percent, 0);
+                rc = MOJOCRASH_platform_read_socket(data->socket, buf + br,
                                                     sizeof (buf) - br);
 
-                if (rc < 0)
-                {
-                    set_send_status("Read failure.", 100, -1);
+                if (rc == -2)
+                    continue;   /* would block, pump and try again. */
+                else if (rc == -1)
+                    set_send_status(data, "Read failure.", 100, -1);
+                else if (rc == 0)
+                    set_send_status(data, "Connection lost.", 100, -1);
+
+                if (data->done)
                     break;
-                } /* if */
 
                 for (j = 0; j < rc; j++)
                 {
@@ -228,30 +278,32 @@ static void *send_all_reports(void *unused)
                     break;  /* oh well. */
             } /* while */
 
-            if (found)  /* we have a response line. Parse it. */
+            if (!found)
+                set_send_status(data, "Bad response from server.", 100, -1);
+            else /* we have a response line. Parse it. */
             {
                 char *ptr = strchr(buf, ' ');
                 if ((ptr != NULL) && (strncmp(buf, "HTTP/", 5) == 0))
                 {
                     if (strncmp(ptr+1, "200 ", 4) == 0)
-                        h->delete_report(app, i);  /* Accepted! Delete it. */
+                        data->h->delete_report(data->app, i);  /* Accepted! */
                 } /* if */
-            } /* if */
+            } /* else */
         } /* if */
 
         /* !!! FIXME: pipelining? */
-        set_send_status("Closing connection...", -1, 0);
-        MOJOCRASH_platform_close_socket(sock);
+        MOJOCRASH_platform_close_socket(data->socket);
+        data->socket = NULL;
     } /* for */
 
-    if (!send_data.done)
-        set_send_status("All done!", 100, 1);  /* tell main thread we won. */
+    if (!data->done)
+        set_send_status(data, "All done!", 100, 1);  /* we won. */
 
-    while (send_data.done != -2)
-        spin();  /* spin until main thread acknowledges we're done. */
+    if (data->socket)
+        MOJOCRASH_platform_close_socket(data->socket);
 
-    send_data.done = -3;  /* tell main thread we're dying. */
-    return NULL;
+    if (data->resolved)
+        MOJOCRASH_platform_free_dns(data->resolved);
 } /* send_all_reports */
 
 
@@ -264,72 +316,43 @@ static inline void delete_all_reports(const MOJOCRASH_report_hooks *h,
 } /* delete_all_reports */
 
 
-static inline void *spin_report_thread(void)
-{
-    return MOJOCRASH_platform_spin_thread(send_all_reports, NULL);
-} /* spin_report_thread */
-
-
 static void handle_reports(const MOJOCRASH_report_hooks *h, const char *app,
                            const char **reports, const int total,
                            const char *url)
 {
     int rc = 0;
+    int success = 0;
+    const char *status = NULL;
 
     if (!h->gui_init())
         return;
 
     rc = h->gui_show(reports, total);
+
     if (rc == 0)  /* 0 == refuse send. */
         delete_all_reports(h, app, total);
 
     else if (rc == 1)  /* 1 == confirm send. */
     {
-        void *thread = NULL;
-
-        strcpy((char *) send_data.status, "Starting up...");
-        send_data.done = 0;
-        send_data.percent = -1;
-        send_data.h = h;
-        send_data.app = app;
-        send_data.reports = reports;
-        send_data.total = total;
-        send_data.url = url;
-        send_data.mutex = MOJOCRASH_platform_create_mutex();
-
-        h->gui_status((char *) send_data.status, -1);
-
-        if (send_data.mutex == NULL)
-            h->gui_quit(0, "System error: couldn't create mutex.");
-        else if ((thread = spin_report_thread()) == NULL)
-            h->gui_quit(0, "System error: couldn't spin thread.");
-        else
-        {
-            char status[sizeof (send_data.status)];
-            int percent = -1;
-            int done = 0;
-
-            while (!done)
-            {
-                MOJOCRASH_platform_lock_mutex(send_data.mutex);
-                done = send_data.done;
-                percent = send_data.percent;
-                strcpy(status, (const char *) send_data.status);
-                MOJOCRASH_platform_unlock_mutex(send_data.mutex);
-
-                if (!h->gui_status(status, percent))
-                    set_send_status("Canceled by user.", 100, -1);
-            } /* while */
-
-            send_data.done = -2;  /* tell thread it's okay to die. */
-            MOJOCRASH_platform_join_thread(thread);
-            h->gui_quit((done > 0), status);
-        } /* else */
-
-        MOJOCRASH_platform_destroy_mutex(send_data.mutex);
+        SendReportData data;
+        data.done = 0;
+        data.status = NULL;
+        data.percent = -1;
+        data.h = h;
+        data.port = 0;
+        data.app = app;
+        data.reports = reports;
+        data.total = total;
+        data.url = url;
+        data.socket = NULL;
+        data.resolved = NULL;
+        send_all_reports(&data);
+        success = (data.done > 0) ? 1 : -1;
+        status = data.status;
     } /* else if */
 
     /* < 0 is GUI error, etc. Just try again later. */
+    h->gui_quit(success, status);
 } /* handle_report */
 
 

@@ -87,16 +87,14 @@ long MOJOCRASH_platform_now(void);
 const char **MOJOCRASH_platform_load_reports(const char *appname, int *total);
 void MOJOCRASH_platform_delete_report(const char *appname, const int idx);
 void MOJOCRASH_platform_free_reports(const char **reports, const int total);
-void *MOJOCRASH_platform_open_socket(const char *host, const int iport);
+void *MOJOCRASH_platform_begin_dns(const char *host, const int port);
+int MOJOCRASH_platform_check_dns(void *dns);
+void MOJOCRASH_platform_free_dns(void *dns);
+void *MOJOCRASH_platform_open_socket(void *dns);
+int MOJOCRASH_platform_check_socket(void *sock);
 void MOJOCRASH_platform_close_socket(void *sock);
 int MOJOCRASH_platform_read_socket(void *sock, char *buf, const int l);
 int MOJOCRASH_platform_write_socket(void *sock, const char *buf, const int l);
-void *MOJOCRASH_platform_create_mutex(void);
-void MOJOCRASH_platform_lock_mutex(void *mutex);
-void MOJOCRASH_platform_unlock_mutex(void *mutex);
-void MOJOCRASH_platform_destroy_mutex(void *mutex);
-void *MOJOCRASH_platform_spin_thread(void *(*fn)(void *), void *data);
-void *MOJOCRASH_platform_join_thread(void *thread);
 
 #ifdef __cplusplus
 }
