@@ -32,7 +32,38 @@ static int report_gui_init(void)
 
 static int report_gui_show(const char **reports, const int total)
 {
+    int i;
     printf("Called %s(%p, %d)\n", __FUNCTION__, reports, total);
+    printf("Here are %d reports:\n\n", total);
+    for (i = 0; i < total; i++)
+        printf("########################################\n%s\n\n", reports[i]);
+
+    while (1)
+    {
+        char buf[64];
+        char *ptr;
+
+        printf("Send them? [yes/no/later]\n> ");
+        if (!fgets(buf, sizeof (buf), stdin))
+            return -1;
+
+        ptr = buf + (strlen(buf) - 1);
+        while (ptr > buf)
+        {
+            if ((*ptr == '\n') || (*ptr == '\r'))
+                *(ptr--) = '\0';
+            else
+                break;
+        } /* while */
+
+        if (strcmp(buf, "yes") == 0)
+            return 1;
+        else if (strcmp(buf, "no") == 0)
+            return 0;
+        else if (strcmp(buf, "later") == 0)
+            return -1;
+    } /* while */
+
     return 1;
 } /* report_gui_show */
 
