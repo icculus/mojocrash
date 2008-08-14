@@ -257,7 +257,7 @@ static void send_all_reports(SendReportData *data)
         MOJOCRASH_StringAppend(&str, &avail, "Accept-Charset: utf-8\n");
         MOJOCRASH_StringAppend(&str, &avail, "Connection: close\n");
         MOJOCRASH_StringAppend(&str, &avail, "Content-Type: text/plain; charset=utf-8\n");
-        MOJOCRASH_StringAppend(&str, &avail, "Content-Length:");
+        MOJOCRASH_StringAppend(&str, &avail, "Content-Length: ");
         MOJOCRASH_StringAppend(&str, &avail, numcvt);
         MOJOCRASH_StringAppend(&str, &avail, "\n\n");
         introlen = strlen(intro);
