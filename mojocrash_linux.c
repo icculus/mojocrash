@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <pwd.h>
 #include <sys/utsname.h>
 
 /* this largely relies on Linux/ELF/glibc specific APIs. */
@@ -91,7 +92,14 @@ void MOJOCRASH_unix_get_logpath(char *buf, const size_t buflen,
 {
     const char *homedir = getenv("HOME");
     if (homedir == NULL)
-        homedir = ".";  /* !!! FIXME: read /etc/passwd? */
+    {
+        struct passwd *pw = getpwuid(getuid());
+        if ((pw != NULL) && (pw->pw_dir != NULL))
+            homedir = pw->pw_dir;
+        else
+            homedir = ".";  /* oh well. */
+    } /* if */
+
     snprintf(buf, buflen, "%s/.mojocrash/%s", homedir, appname);
 } /* MOJOCRASH_unix_get_logpath */
 

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
+#include <pwd.h>
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
 #include <mach/vm_map.h>
@@ -237,7 +238,13 @@ void MOJOCRASH_unix_get_logpath(char *buf, const size_t buflen,
     /* !!! FIXME: use Carbon call for this... */
     const char *homedir = getenv("HOME");
     if (homedir == NULL)
-        homedir = ".";  /* !!! FIXME: read /etc/passwd? */
+    {
+        struct passwd *pw = getpwuid(getuid());
+        if ((pw != NULL) && (pw->pw_dir != NULL))
+            homedir = pw->pw_dir;
+        else
+            homedir = ".";  /* oh well. */
+    } /* if */
 
     snprintf(buf, buflen, "%s/Library/Application Support/MojoCrash/%s",
              homedir, appname);
