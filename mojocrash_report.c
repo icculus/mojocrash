@@ -87,7 +87,7 @@ static int split_url(char *url, char **prot, char **user, char **pass,
         *port = ptr + 1;
     } /* if */
 
-    return 0;
+    return 1;
 } /* split_url */
 
 
