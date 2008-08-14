@@ -61,8 +61,10 @@ void MOJOCRASH_StringAppend(char **_dst, int *avail, const char *src);
 void MOJOCRASH_StringAppendMojoCrashVersion(char **dst, int *avail);
 
 long MOJOCRASH_StringToLong(const char *str);
+char *MOJOCRASH_ULongToString(unsigned long num, char *str);
 char *MOJOCRASH_LongToString(long num, char *str);
 char *MOJOCRASH_PtrToString(const void *ptr, char *str);
+
 
 /* helper macro for counting items in a static array. */
 #define STATICARRAYLEN(x) (sizeof (x) / sizeof ((x)[0]))
