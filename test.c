@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <signal.h>
 
 #include "mojocrash.h"
 
@@ -8,7 +10,7 @@
 #define APPVERSION "1.0"
 #define REPORTURL "http://icculus.org"
 
-void f4() { printf("crashing!\n"); fflush(stdout); *((int *)0) = 0; }
+void f4() { printf("crashing!\n"); fflush(stdout); abort(); } //*((int *)0) = 0; }
 void f3() { f4(); }
 void f2() { f3(); }
 void f1() { f2(); }
