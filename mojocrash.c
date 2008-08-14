@@ -204,13 +204,13 @@ char *MOJOCRASH_PtrToString(const void *ptr, char *str)
 static int installed = 0;
 static MOJOCRASH_hooks hooks;
 static char scratch[256];
-static char numcvt[32];
 static char appname[MOJOCRASH_MAX_APPNAME_STRING];
 static char version[MOJOCRASH_MAX_VERSION_STRING];
 
 
 static int callstack_callback(void *addr)
 {
+    char numcvt[32];
     char *str = scratch;
     int avail = sizeof (scratch);
     MOJOCRASH_StringAppend(&str, &avail, "CALLSTACK ");
@@ -274,6 +274,7 @@ void MOJOCRASH_StringAppendMojoCrashVersion(char **dst, int *avail)
 
 static int get_basics(int sig)
 {
+    char numcvt[32];
     char *str = NULL;
     int avail = 0;
 
