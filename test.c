@@ -8,7 +8,7 @@
 
 #define APPNAME "MyTestCrashApp"
 #define APPVERSION "1.0"
-#define REPORTURL "http://icculus.org"
+#define REPORTURL "http://icculus.org/"
 
 void f4() { printf("crashing!\n"); fflush(stdout); abort(); } //*((int *)0) = 0; }
 void f3() { f4(); }
