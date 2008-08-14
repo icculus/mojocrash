@@ -27,7 +27,8 @@ static void set_send_status(SendReportData *data, const char *status,
         data->percent = percent;
     } /* if */
 
-    data->h->gui_status(data->status, data->percent);
+    if ((!data->h->gui_status(data->status, data->percent)) && (!data->done))
+        set_send_status(data, "Canceled by user.", 100, -1);
 } /* set_send_status */
 
 
