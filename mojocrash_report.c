@@ -186,20 +186,23 @@ static int server_connect(SendReportData *data)
         return 0;
 
     data->socket = MOJOCRASH_platform_open_socket(data->resolved);
-    while (1)
+    if (data->socket != NULL)
     {
-        int rc;
-        set_send_status(data, "Connecting...", data->percent, 0);
-        rc = MOJOCRASH_platform_check_socket(data->socket);
-        if (rc == 1)  /* done! */
-            break;
-        else if (rc == -1)  /* failed. */
+        while (1)
         {
-            MOJOCRASH_platform_close_socket(data->socket);
-            data->socket = NULL;
-            break;
-        } /* else if */
-    } /* while */
+            int rc;
+            set_send_status(data, "Connecting...", data->percent, 0);
+            rc = MOJOCRASH_platform_check_socket(data->socket);
+            if (rc == 1)  /* done! */
+                break;
+            else if (rc == -1)  /* failed. */
+            {
+                MOJOCRASH_platform_close_socket(data->socket);
+                data->socket = NULL;
+                break;
+            } /* else if */
+        } /* while */
+    } /* if */
 
     if (data->socket == NULL)
     {
