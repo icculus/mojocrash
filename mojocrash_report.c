@@ -38,7 +38,7 @@ static int split_url(char *url, char **prot, char **user, char **pass,
     char *ptr;
     char *ptr2;
 
-    prot = user = pass = host = port = path = NULL;
+    *prot = *user = *pass = *host = *port = *path = NULL;
 
     ptr = strchr(url, ':');
     if (ptr == NULL)
@@ -54,7 +54,7 @@ static int split_url(char *url, char **prot, char **user, char **pass,
     ptr2 = strchr(ptr, '/');
     if (ptr2 == NULL)
     {
-        *path = "";
+        *path = "/";
         *host = ptr;
         return 1;
     } /* if */
