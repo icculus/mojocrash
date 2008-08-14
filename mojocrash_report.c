@@ -180,8 +180,6 @@ static int resolve_server_address(SendReportData *data)
 
 static int server_connect(SendReportData *data)
 {
-    /* !!! FIXME: proxies? */
-
     if (!resolve_server_address(data))
         return 0;
 
