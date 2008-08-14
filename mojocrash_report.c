@@ -12,6 +12,7 @@ typedef struct
     const char **reports;
     int total;
     const char *url;
+    char host[128];
     void *socket;
     void *resolved;
 } SendReportData;
@@ -114,6 +115,13 @@ static int resolve_server_address(SendReportData *data)
         return 0;
     } /* if */
 
+    if (strlen(host) >= sizeof (data->host))
+    {
+        set_send_status(data, "BUG: Hostname buffer is too small.", 100, -1);
+        return 0;
+    } /* if */
+    strcpy(data->host, host);
+
     if ((prot == NULL) || (strcmp(prot, "http") != 0))
     {
         set_send_status(data, "BUG: Unsupported protocol.", 100, -1);
@@ -131,7 +139,7 @@ static int resolve_server_address(SendReportData *data)
     else
         data->port = 80;
 
-    data->resolved = MOJOCRASH_platform_begin_dns(host, data->port);
+    data->resolved = MOJOCRASH_platform_begin_dns(data->host, data->port);
     while (1)
     {
         set_send_status(data, "Looking up hostname...", -1, 0);
@@ -207,8 +215,19 @@ static void send_all_reports(SendReportData *data)
         bytesin += strlen(data->reports[i]);
     } /* for */
 
+    if (bytesin == 0)  /* nothing to do? */
+    {
+        data->done = 1;
+        return;
+    } /* if */
+
     for (i = 0; (i < data->total) && (!data->done); i++)
     {
+        char numcvt[32];
+        char intro[1024];
+        int introlen = 0;
+        char *str = NULL;
+        int avail = 0;
         const char *report = data->reports[i];
         const int len = strlen(report);
         int bw = 0;
@@ -224,6 +243,40 @@ static void send_all_reports(SendReportData *data)
         if (!server_connect(data))
             break;  /* error message was set elsewhere. */
 
+        str = intro;
+        avail = sizeof (intro);
+        MOJOCRASH_ULongToString((unsigned long) len, numcvt);
+        MOJOCRASH_StringAppend(&str, &avail, "POST / HTTP/1.1\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Host: ");
+        MOJOCRASH_StringAppend(&str, &avail, data->host);
+        MOJOCRASH_StringAppend(&str, &avail, "\n");
+        MOJOCRASH_StringAppend(&str, &avail, "User-Agent: mojocrash/");
+        MOJOCRASH_StringAppendMojoCrashVersion(&str, &avail);
+        MOJOCRASH_StringAppend(&str, &avail, "\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Accept: text/plain\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Accept-Charset: utf-8\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Connection: close\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Content-Type: text/plain; charset=utf-8\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Content-Length:");
+        MOJOCRASH_StringAppend(&str, &avail, numcvt);
+        MOJOCRASH_StringAppend(&str, &avail, "\n\n");
+        introlen = strlen(intro);
+
+        bw = 0;
+        while ((bw < introlen) && (!data->done))
+        {
+            set_send_status(data, "Sending...", percent(bytesout, bytesin), 0);
+            rc = MOJOCRASH_platform_write_socket(data->socket, intro + bw,
+                                                 introlen - bw);
+            if (rc == -1)
+                set_send_status(data, "Network write failure.", 100, -1);
+            else if (rc == 0)
+                set_send_status(data, "Connection lost.", 100, -1);
+            else if (rc > 0)
+                bw += rc;
+        } /* while */
+
+        bw = 0;
         while ((bw < len) && (!data->done))
         {
             set_send_status(data, "Sending...", percent(bytesout, bytesin), 0);
@@ -297,9 +350,6 @@ static void send_all_reports(SendReportData *data)
         data->socket = NULL;
     } /* for */
 
-    if (!data->done)
-        set_send_status(data, "All done!", 100, 1);  /* we won. */
-
     if (data->socket)
         MOJOCRASH_platform_close_socket(data->socket);
 
@@ -345,9 +395,12 @@ static void handle_reports(const MOJOCRASH_report_hooks *h, const char *app,
         data.reports = reports;
         data.total = total;
         data.url = url;
+        data.host[0] = '\0';
         data.socket = NULL;
         data.resolved = NULL;
         send_all_reports(&data);
+        if (!data.done)
+            set_send_status(&data, "All done!", 100, 1);  /* we won. */
         success = (data.done > 0) ? 1 : -1;
         status = data.status;
     } /* else if */
