@@ -23,7 +23,7 @@ extern "C" {
 
 
 typedef void (*MOJOCRASH_catcher)(int sig);
-typedef int (*MOJOCRASH_get_callstack_callback)(void *addr);  /* !!! FIXME: const void *addr */
+typedef int (*MOJOCRASH_get_callstack_callback)(const void *addr);
 typedef int (*MOJOCRASH_get_objects_callback)(const char *fname,
                                           const void *addr, unsigned long len);
 typedef int (*MOJOCRASH_get_etc_callback)(const char *key, const char *value);

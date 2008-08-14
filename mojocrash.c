@@ -208,7 +208,7 @@ static char appname[MOJOCRASH_MAX_APPNAME_STRING];
 static char version[MOJOCRASH_MAX_VERSION_STRING];
 
 
-static int callstack_callback(void *addr)
+static int callstack_callback(const void *addr)
 {
     char numcvt[32];
     char *str = scratch;
