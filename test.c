@@ -38,7 +38,14 @@ static int report_gui_show(const char **reports, const int total)
 
 static int report_gui_status(const char *statustext, int percent)
 {
-    printf("Called %s('%s', %d)\n", __FUNCTION__, statustext, percent);
+    static char buf[1024];
+    static int lastpct = -1;
+    if ((strcmp(buf, statustext) != 0) || (percent != lastpct))
+    {
+        lastpct = percent;
+        strcpy(buf, statustext);
+        printf("Called %s('%s', %d)\n", __FUNCTION__, statustext, percent);
+    } /* if */
     return 1;
 } /* report_gui_status */
 
