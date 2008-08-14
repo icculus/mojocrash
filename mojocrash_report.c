@@ -12,7 +12,9 @@ typedef struct
     const char **reports;
     int total;
     const char *url;
+    int use_proxy;
     char host[128];
+    char path[128];
     void *socket;
     void *resolved;
 } SendReportData;
@@ -102,13 +104,18 @@ static int resolve_server_address(SendReportData *data)
     if (data->resolved != NULL)
         return 1;  /* already done. */
 
-    if (strlen(data->url) >= sizeof (url))
+    if (MOJOCRASH_platform_get_http_proxy(url, sizeof (url)))
+        data->use_proxy = 1;
+    else
     {
-        set_send_status(data, "BUG: URL buffer is too small.", 100, -1);
-        return 0;
-    } /* if */
+        if (strlen(data->url) >= sizeof (url))
+        {
+            set_send_status(data, "BUG: URL buffer is too small.", 100, -1);
+            return 0;
+        } /* if */
+        strcpy(url, data->url);
+    } /* else */
 
-    strcpy(url, data->url);
     if (!split_url(url, &prot, &user, &pass, &host, &port, &path))
     {
         set_send_status(data, "BUG: Invalid URL.", 100, -1);
@@ -121,6 +128,13 @@ static int resolve_server_address(SendReportData *data)
         return 0;
     } /* if */
     strcpy(data->host, host);
+
+    if (strlen(path) >= sizeof (data->path))
+    {
+        set_send_status(data, "BUG: Path buffer is too small.", 100, -1);
+        return 0;
+    } /* if */
+    strcpy(data->path, path);
 
     if ((prot == NULL) || (strcmp(prot, "http") != 0))
     {
@@ -246,10 +260,22 @@ static void send_all_reports(SendReportData *data)
         str = intro;
         avail = sizeof (intro);
         MOJOCRASH_ULongToString((unsigned long) len, numcvt);
-        MOJOCRASH_StringAppend(&str, &avail, "POST / HTTP/1.1\n");
-        MOJOCRASH_StringAppend(&str, &avail, "Host: ");
-        MOJOCRASH_StringAppend(&str, &avail, data->host);
-        MOJOCRASH_StringAppend(&str, &avail, "\n");
+
+        if (data->use_proxy)
+        {
+            MOJOCRASH_StringAppend(&str, &avail, "POST ");
+            MOJOCRASH_StringAppend(&str, &avail, data->url);
+            MOJOCRASH_StringAppend(&str, &avail, " HTTP/1.1\n");
+        } /* if */
+        else
+        {
+            MOJOCRASH_StringAppend(&str, &avail, "POST /");
+            MOJOCRASH_StringAppend(&str, &avail, data->path);
+            MOJOCRASH_StringAppend(&str, &avail, " HTTP/1.1\n");
+            MOJOCRASH_StringAppend(&str, &avail, "Host: ");
+            MOJOCRASH_StringAppend(&str, &avail, data->host);
+            MOJOCRASH_StringAppend(&str, &avail, "\n");
+        } /* else */
         MOJOCRASH_StringAppend(&str, &avail, "User-Agent: mojocrash/");
         MOJOCRASH_StringAppendMojoCrashVersion(&str, &avail);
         MOJOCRASH_StringAppend(&str, &avail, "\n");
@@ -395,7 +421,9 @@ static void handle_reports(const MOJOCRASH_report_hooks *h, const char *app,
         data.reports = reports;
         data.total = total;
         data.url = url;
+        data.use_proxy = 0;
         data.host[0] = '\0';
+        data.path[0] = '\0';
         data.socket = NULL;
         data.resolved = NULL;
         send_all_reports(&data);

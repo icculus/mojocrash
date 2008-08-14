@@ -103,6 +103,31 @@ void MOJOCRASH_unix_get_osver(char *buf, const size_t buflen)
 } /* MOJOCRASH_unix_get_osver */
 
 
+int MOJOCRASH_platform_get_http_proxy(char *buf, const int len)
+{
+    const char *env;
+    env = getenv("http_proxy");
+    if (env != NULL)
+    {
+        if (strlen(env) >= len)
+            return 0;
+        strcpy(buf, env);
+        return 1;
+    } /* if */
+
+    env = getenv("all_proxy");
+    if (env != NULL)
+    {
+        if (strlen(env) >= len)
+            return 0;
+        strcpy(buf, env);
+        return 1;
+    } /* if */
+        
+    return 0;
+} /* MOJOCRASH_platform_get_http_proxy */
+
+
 int MOJOCRASH_unix_init(void)
 {
     ssize_t rc = readlink("/proc/self/exe", exename, sizeof (exename) - 1);

@@ -14,6 +14,7 @@
 #include <execinfo.h>
 #include <dlfcn.h>
 #include <Carbon/Carbon.h>
+#include <SystemConfiguration/SystemConfiguration.h>
 
 #if MOJOCRASH_PLATFORM_64BIT
 typedef struct mach_header_64 MachHeader;
@@ -254,6 +255,72 @@ void MOJOCRASH_unix_get_osver(char *buf, const size_t buflen)
                  macver_major, macver_minor, macver_patch);
     } /* else */
 } /* MOJOCRASH_unix_get_osver */
+
+
+int MOJOCRASH_platform_get_http_proxy(char *buf, const int _len)
+{
+    /* !!! FIXME: doesn't query for auth settings. */
+    const CFStringBuiltInEncodings encoding = kCFStringEncodingUTF8;
+    int len = _len - 1;
+    CFDictionaryRef dict = NULL;
+    const void *val = NULL;
+    int ival = 0;
+    int retval = 0;
+
+    /* !!! FIXME: can this be appended to a proxy setting already? */
+    strcpy(buf, "http://");
+    ival = strlen(buf);
+    buf += ival;
+    len -= ival;
+
+    if ((dict = SCDynamicStoreCopyProxies(NULL)) == NULL)
+        goto get_http_proxy_done;
+    else if (!(val = CFDictionaryGetValue(dict, kSCPropNetProxiesHTTPEnable)))
+        goto get_http_proxy_done;
+    else if (!CFNumberGetValue((CFNumberRef) val, kCFNumberIntType, &ival))
+        goto get_http_proxy_done;
+    else if (ival == 0)  /* no HTTP proxy enabled. */
+        goto get_http_proxy_done;
+    else if (!(val = CFDictionaryGetValue(dict, kSCPropNetProxiesHTTPPort)))
+        goto get_http_proxy_done;
+    else if (!CFNumberGetValue((CFNumberRef) val, kCFNumberIntType, &ival))
+        goto get_http_proxy_done;
+    else if (ival <= 0)  /* just in case */
+        goto get_http_proxy_done;
+    else if (!(val = CFDictionaryGetValue(dict, kSCPropNetProxiesHTTPProxy)))
+        goto get_http_proxy_done;
+    else if (!CFStringGetCString((CFStringRef) val, buf, len, encoding))
+        goto get_http_proxy_done;
+    else
+    {
+        const long port = ival;
+        if (port != 80)
+        {
+            char numcvt[32];
+            MOJOCRASH_LongToString(port, numcvt);
+            ival = strlen(buf);
+            len -= ival;
+            buf += ival;
+            if (len <= (strlen(numcvt) + 1))
+                goto get_http_proxy_done;
+
+            /* !!! FIXME: doesn't work if there's anything after the host. */
+            buf[0] = ':';
+            strcpy(buf + 1, numcvt);
+        } /* if */
+        retval = 1;  /* win! */
+    } /* else */
+
+    /*
+     * We SHOULD look to see if our host is in the exclusion list, but
+     *  I reasonably doubt anyone is going to put it there.
+     */
+
+get_http_proxy_done:
+    if (dict)
+        CFRelease(dict);
+    return retval;
+} /* MOJOCRASH_platform_get_http_proxy */
 
 
 int MOJOCRASH_unix_init(void)

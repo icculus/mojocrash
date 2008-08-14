@@ -101,6 +101,7 @@ int MOJOCRASH_platform_check_socket(void *sock);
 void MOJOCRASH_platform_close_socket(void *sock);
 int MOJOCRASH_platform_read_socket(void *sock, char *buf, const int l);
 int MOJOCRASH_platform_write_socket(void *sock, const char *buf, const int l);
+int MOJOCRASH_platform_get_http_proxy(char *buf, const int len);
 
 #ifdef __cplusplus
 }
