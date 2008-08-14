@@ -44,7 +44,7 @@ static int report_gui_status(const char *statustext, int percent)
 
 static void report_gui_quit(const int success, const char *statustext)
 {
-    printf("Called %s\n", __FUNCTION__);
+    printf("Called %s(%d, '%s')\n", __FUNCTION__, success, statustext);
 } /* report_gui_quit */
 
 
