@@ -274,12 +274,6 @@ int MOJOCRASH_platform_get_http_proxy(char *buf, const int _len)
     int ival = 0;
     int retval = 0;
 
-    /* !!! FIXME: can this be appended to a proxy setting already? */
-    strcpy(buf, "http://");
-    ival = strlen(buf);
-    buf += ival;
-    len -= ival;
-
     if ((dict = SCDynamicStoreCopyProxies(NULL)) == NULL)
         goto get_http_proxy_done;
     else if (!(val = CFDictionaryGetValue(dict, kSCPropNetProxiesHTTPEnable)))
@@ -296,24 +290,42 @@ int MOJOCRASH_platform_get_http_proxy(char *buf, const int _len)
         goto get_http_proxy_done;
     else if (!(val = CFDictionaryGetValue(dict, kSCPropNetProxiesHTTPProxy)))
         goto get_http_proxy_done;
-    else if (!CFStringGetCString((CFStringRef) val, buf, len, encoding))
+    else if (!CFStringGetCString((CFStringRef) val, buf+7, len-7, encoding))
         goto get_http_proxy_done;
     else
     {
         const long port = ival;
+
+        /* make sure the thing starts with "http://" ... */
+        /* We wrote the string with room for this, so slide back if needed. */
+        if (strncmp(buf+7, "http://", 7) == 0)
+            memmove(buf, buf + 7, strlen(buf+7) + 1);
+        else
+            memcpy(buf, "http://", 7);  /* nope: add it in. */
+
         if (port != 80)
         {
+            char *ptr = NULL;
             char numcvt[32];
             MOJOCRASH_LongToString(port, numcvt);
-            ival = strlen(buf);
-            len -= ival;
-            buf += ival;
-            if (len <= (strlen(numcvt) + 1))
-                goto get_http_proxy_done;
+            if ((len - strlen(buf)) <= (strlen(numcvt) + 1))
+                goto get_http_proxy_done;  /* not enough space. */
 
-            /* !!! FIXME: doesn't work if there's anything after the host. */
-            buf[0] = ':';
-            strcpy(buf + 1, numcvt);
+            /* Make sure we insert this at the right place... */
+            ptr = strchr(buf+7, '/');
+            if (ptr == NULL)
+            {
+                ptr = buf + strlen(buf);
+                *ptr = ':';
+                strcpy(ptr+1, numcvt);
+            } /* if */
+            else
+            {
+                const int numlen = strlen(numcvt);
+                memmove(ptr + (numlen + 1), ptr, strlen(ptr) + 1);
+                *ptr = ':';
+                memcpy(ptr+1, numcvt, numlen);
+            } /* else */
         } /* if */
         retval = 1;  /* win! */
     } /* else */
