@@ -42,7 +42,7 @@ create table bogus_reasons (
 
 create table bugtracker_posts (
     id int unsigned not null auto_increment,
-    stack_sha1 char(40) not null,
+    guid char(40) not null,  -- SHA1 of appname . appver . processed_callstack
     trackerid int unsigned not null,
     primary key (id)
 ) character set utf8;

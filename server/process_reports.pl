@@ -64,11 +64,11 @@ sub add_static_id {
 
 
 sub poke_bugtracker {
-    my ($stacksha1, $stack, $cmdargsref) = @_;
+    my ($guid, $stack, $cmdargsref, $etcsref) = @_;
     my $processed_text = '';
 
     my $link = get_database_link();
-    my $sql = 'select id, trackerid from bugtracker_posts where (stack_sha1=$stacksha1) limit 1';
+    my $sql = 'select id, trackerid from bugtracker_posts where (guid=$guid) limit 1';
     my $sth = $link->prepare($sql);
     $sth->execute() or die "can't execute the query: $sth->errstr";
     my @row = $sth->fetchrow_array();
@@ -235,15 +235,15 @@ sub handle_unprocessed_report {
         }
     }
 
-    my $callstack_sha1 = undef;
+    my $guid = undef;
     my $processed_text = undef;
     if (not defined $bogus) {
         # okay, we're parsed now. Now it's time to process the information.
         #  first, we need to convert the stack into source files and line
         #  numbers.
         my $processed_callstack = convert_callstack(\@callstack, \%objs);
-        $callstack_sha1 = sha1($processed_callstack);
-        $processed_text = poke_bugtracker($callstack_sha1, $processed_callstack, \@cmdargs);
+        $guid = sha1($appname . $appver . $processed_callstack);
+        $processed_text = poke_bugtracker($guid, $processed_callstack, \%cmdargs, \%etcs);
     }
 
     my $link = get_database_link();
