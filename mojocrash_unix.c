@@ -22,7 +22,6 @@
 
 #include "mojocrash_internal.h"
 
-static char osversion[64];
 static int crashlogfd = -1;
 static struct timeval starttime;
 
@@ -156,6 +155,8 @@ int MOJOCRASH_platform_end_crashlog(void)
 
 const char *MOJOCRASH_platform_version(void)
 {
+    static char osversion[64];
+    MOJOCRASH_unix_get_osver(osversion, sizeof (osversion));
     return osversion;
 } /* MOJOCRASH_platform_version */
 
