@@ -86,8 +86,14 @@ sub poke_bugtracker {
     }
 
     foreach (keys $$cmdargsref) {
-        $report .= $_ . ": " . $$cmdargsref[$_] . "\n";
+        $report .= $_ . ': ' . $$cmdargsref[$_] . "\n";
     }
+
+    foreach (keys $$etcsref) {
+        $report .= "\nETC_KEY: $_\n" . 'ETC_VALUE: ' . $$etcsref[$_] . "\n";
+    }
+
+    $report .= "\n\n";
 }
 
 
