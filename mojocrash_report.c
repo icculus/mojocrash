@@ -266,27 +266,27 @@ static void send_all_reports(SendReportData *data)
         {
             MOJOCRASH_StringAppend(&str, &avail, "POST ");
             MOJOCRASH_StringAppend(&str, &avail, data->url);
-            MOJOCRASH_StringAppend(&str, &avail, " HTTP/1.1\n");
+            MOJOCRASH_StringAppend(&str, &avail, " HTTP/1.1\r\n");
         } /* if */
         else
         {
             MOJOCRASH_StringAppend(&str, &avail, "POST /");
             MOJOCRASH_StringAppend(&str, &avail, data->path);
-            MOJOCRASH_StringAppend(&str, &avail, " HTTP/1.1\n");
+            MOJOCRASH_StringAppend(&str, &avail, " HTTP/1.1\r\n");
             MOJOCRASH_StringAppend(&str, &avail, "Host: ");
             MOJOCRASH_StringAppend(&str, &avail, data->host);
-            MOJOCRASH_StringAppend(&str, &avail, "\n");
+            MOJOCRASH_StringAppend(&str, &avail, "\r\n");
         } /* else */
         MOJOCRASH_StringAppend(&str, &avail, "User-Agent: mojocrash/");
         MOJOCRASH_StringAppendMojoCrashVersion(&str, &avail);
-        MOJOCRASH_StringAppend(&str, &avail, "\n");
-        MOJOCRASH_StringAppend(&str, &avail, "Accept: text/plain\n");
-        MOJOCRASH_StringAppend(&str, &avail, "Accept-Charset: utf-8\n");
-        MOJOCRASH_StringAppend(&str, &avail, "Connection: close\n");
-        MOJOCRASH_StringAppend(&str, &avail, "Content-Type: text/plain; charset=utf-8\n");
+        MOJOCRASH_StringAppend(&str, &avail, "\r\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Accept: text/plain\r\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Accept-Charset: utf-8\r\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Connection: close\r\n");
+        MOJOCRASH_StringAppend(&str, &avail, "Content-Type: text/plain; charset=utf-8\r\n");
         MOJOCRASH_StringAppend(&str, &avail, "Content-Length: ");
         MOJOCRASH_StringAppend(&str, &avail, numcvt);
-        MOJOCRASH_StringAppend(&str, &avail, "\n\n");
+        MOJOCRASH_StringAppend(&str, &avail, "\r\n\r\n");
         introlen = strlen(intro);
 
         bw = 0;
