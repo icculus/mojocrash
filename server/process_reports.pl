@@ -136,13 +136,13 @@ sub handle_unprocessed_report {
     my $signal = undef;
     my $uptime = undef;
     my $crashtime = undef;
-    my $lastcmd = undef;
-    my %cmdargs;
-    my %objs;
-    my @callstack;
-    my %etcs;
-    my $etckey;
-    my %seen;
+    my $etckey = undef;
+    my $lastcmd = '';
+    my %cmdargs = ();
+    my %objs = ();
+    my @callstack = ();
+    my %etcs = ();
+    my %seen = ();
 
     my @textlines = split(/(\r\n|\r|\n)/, $text);
     foreach (@textlines) {
@@ -156,7 +156,13 @@ sub handle_unprocessed_report {
 
         # !!! FIXME: if line is > 512 chars, consider it bogus?
 
-        my ($cmd, $args) = /\A(.*?)\s+(.*?)\Z/;
+        my $cmd = '';
+        my $args = '';
+        if ($_ eq 'END') {
+            $cmd = $_;
+        } else {
+            ($cmd, $args) = /\A(.*?)\s+(.*?)\Z/;
+        }
 
         if ((not defined $cmd) or ($cmd eq '')) {
             $bogus = 'corrupt line?';
@@ -201,7 +207,7 @@ sub handle_unprocessed_report {
             $multiple_okay = 1;
             if ($seen{'CALLSTACK'}) {
                 $bogus = 'OBJECT after CALLSTACK';
-            } elsif (not $cmd =~ /\A(.*?)\/(\d+)\/(\d+)\Z/) {
+            } elsif (not $args =~ /\A(.*?)\/(\d+)\/(\d+)\Z/) {
                 $bogus = 'invalid OBJECT format';
             } else {
                 my ($obj, $addr, $len) = ( $1, $2, $3 );
@@ -239,7 +245,7 @@ sub handle_unprocessed_report {
             $bogus = 'unknown command';
         }
 
-        if ((defined $etckey) and ($lastcmd ne 'ETC_KEY')) {
+        if ((defined $etckey) && ($lastcmd ne 'ETC_KEY')) {
             $bogus = 'ETC_KEY not followed by ETC_VALUE';
         } elsif (($seen{$cmd}) && (not $multiple_okay)) {
             $bogus = "multiple instances of '$cmd' command";
@@ -314,7 +320,7 @@ sub load_static_id_hash {
     my $sql = "select id, $field from $table";
     my $sth = $link->prepare($sql);
     $sth->execute() or die "can't execute the query: " . $sth->errstr;
-    $hashref = {};
+    %$hashref = ();
     while (my @row = $sth->fetchrow_array()) {
         $$hashref{$row[1]} = $row[0];
     }
