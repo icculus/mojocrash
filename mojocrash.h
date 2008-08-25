@@ -52,6 +52,7 @@ typedef enum
     MOJOCRASH_GUISHOW_IGNORE,
     MOJOCRASH_GUISHOW_REJECT,
     MOJOCRASH_GUISHOW_SEND,
+    MOJOCRASH_GUISHOW_SEND_BACKGROUND,
 } MOJOCRASH_GuiShowValue;
 
 typedef struct MOJOCRASH_report_hooks
@@ -67,6 +68,8 @@ typedef struct MOJOCRASH_report_hooks
 
 void MOJOCRASH_report(const char *appname, const char *url,
                       const MOJOCRASH_report_hooks *h);
+
+int MOJOCRASH_reporting(void);
 
 #ifdef __cplusplus
 }

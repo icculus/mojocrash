@@ -348,7 +348,7 @@ static void dns_resolver_thread(void *_dns)
 
 
 void *MOJOCRASH_platform_begin_dns(const char *host, const int port,
-                                   const int block)
+                                   const int blocking)
 {
     DnsResolve *retval = NULL;
     int mutex_initted = 0;
@@ -369,9 +369,9 @@ void *MOJOCRASH_platform_begin_dns(const char *host, const int port,
     retval->port = port;
     retval->addr = NULL;
     retval->status = 0;
-    retval->app_done = block;
+    retval->app_done = 0;
 
-    if (block)
+    if (blocking)
         dns_resolver_thread(retval);
     else
     {
@@ -397,6 +397,8 @@ int MOJOCRASH_platform_check_dns(void *_dns)
 {
     DnsResolve *dns = (DnsResolve *) _dns;
     int retval;
+    if (dns == NULL)
+        return -1;
     pthread_mutex_lock(&dns->mutex);
     retval = dns->status;
     pthread_mutex_unlock(&dns->mutex);
@@ -422,7 +424,7 @@ void MOJOCRASH_platform_free_dns(void *_dns)
 } /* MOJOCRASH_platform_free_dns */
 
 
-void *MOJOCRASH_platform_open_socket(void *_dns)
+void *MOJOCRASH_platform_open_socket(void *_dns, const int blocking)
 {
     DnsResolve *dns = (DnsResolve *) _dns;
     const struct addrinfo *addr = NULL;
@@ -450,11 +452,16 @@ void *MOJOCRASH_platform_open_socket(void *_dns)
 
         if (fd == -1)
             continue;
-        else if ((flags = fcntl(fd, F_GETFL, 0)) < 0)
-            continue;
-        else if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
-            continue;
-        else if (connect(fd, addr->ai_addr, addr->ai_addrlen) == -1)
+
+        if (!blocking)
+        {
+            if ((flags = fcntl(fd, F_GETFL, 0)) < 0)
+                continue;
+            else if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+                continue;
+        } /* if */
+
+        if (connect(fd, addr->ai_addr, addr->ai_addrlen) == -1)
         {
             if (errno != EINPROGRESS)
                 continue;

@@ -52,7 +52,7 @@ static MOJOCRASH_GuiShowValue report_gui_show(const char **reports,
         char buf[64];
         char *ptr;
 
-        printf("Send them? [yes/no/later]\n> ");
+        printf("Send them? [yes/no/background/later]\n> ");
         if (!fgets(buf, sizeof (buf), stdin))
             return MOJOCRASH_GUISHOW_IGNORE;
 
@@ -67,6 +67,8 @@ static MOJOCRASH_GuiShowValue report_gui_show(const char **reports,
 
         if (strcmp(buf, "yes") == 0)
             return MOJOCRASH_GUISHOW_SEND;
+        else if (strcmp(buf, "background") == 0)
+            return MOJOCRASH_GUISHOW_SEND_BACKGROUND;
         else if (strcmp(buf, "no") == 0)
             return MOJOCRASH_GUISHOW_REJECT;
         else if (strcmp(buf, "later") == 0)
@@ -106,6 +108,12 @@ void report(void)
     hooks.gui_status = report_gui_status;
     hooks.gui_quit = report_gui_quit;
     MOJOCRASH_report(APPNAME, REPORTURL, &hooks);
+    if (MOJOCRASH_reporting())
+    {
+        printf("Waiting for reporting to finish...\n");
+        while (MOJOCRASH_reporting())
+            doSleep(10000);
+    } /* if */
 } /* report */
 
 

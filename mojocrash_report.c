@@ -1,9 +1,12 @@
 #define __MOJOCRASH_INTERNAL__ 1
 #include "mojocrash_internal.h"
 
+static volatile int reporting = 0;
+
 typedef struct
 {
     int done;
+    int background;
     const char *status;
     int percent;
     const MOJOCRASH_report_hooks *h;
@@ -32,8 +35,11 @@ static void set_send_status(SendReportData *data, const char *status,
         data->percent = percent;
     } /* if */
 
-    if ((!data->h->gui_status(data->status, data->percent)) && (!data->done))
+    if (!data->background)
+    {
+        if ((!data->h->gui_status(data->status, data->percent))&&(!data->done))
         set_send_status(data, "Canceled by user.", 100, -1);
+    } /* if */
 } /* set_send_status */
 
 
@@ -155,10 +161,13 @@ static int resolve_server_address(SendReportData *data)
     else
         data->port = 80;
 
-    data->resolved = MOJOCRASH_platform_begin_dns(data->host, data->port, 0);
-    while (1)
+    /* If we're already in a background thread, we can block here. */
+    set_send_status(data, "Looking up hostname...", -1, 0);
+    data->resolved = MOJOCRASH_platform_begin_dns(data->host, data->port,
+                                                  data->background);
+
+    while (data->resolved != NULL)
     {
-        set_send_status(data, "Looking up hostname...", -1, 0);
         const int rc = MOJOCRASH_platform_check_dns(data->resolved);
         if (rc == 1)  /* done! */
             break;
@@ -166,8 +175,8 @@ static int resolve_server_address(SendReportData *data)
         {
             MOJOCRASH_platform_free_dns(data->resolved);
             data->resolved = NULL;
-            break;
         } /* else if */
+        set_send_status(data, "Looking up hostname...", -1, 0);
     } /* while */
 
     if (data->resolved == NULL)
@@ -185,23 +194,22 @@ static int server_connect(SendReportData *data)
     if (!resolve_server_address(data))
         return 0;
 
-    data->socket = MOJOCRASH_platform_open_socket(data->resolved);
-    if (data->socket != NULL)
+    /* If we're already in a background thread, we can block here. */
+    set_send_status(data, "Connecting...", data->percent, 0);
+    data->socket = MOJOCRASH_platform_open_socket(data->resolved,
+                                                  data->background);
+
+    while (data->socket != NULL)
     {
-        while (1)
+        const int rc = MOJOCRASH_platform_check_socket(data->socket);
+        if (rc == 1)  /* done! */
+            break;
+        else if (rc == -1)  /* failed. */
         {
-            int rc;
-            set_send_status(data, "Connecting...", data->percent, 0);
-            rc = MOJOCRASH_platform_check_socket(data->socket);
-            if (rc == 1)  /* done! */
-                break;
-            else if (rc == -1)  /* failed. */
-            {
-                MOJOCRASH_platform_close_socket(data->socket);
-                data->socket = NULL;
-                break;
-            } /* else if */
-        } /* while */
+            MOJOCRASH_platform_close_socket(data->socket);
+            data->socket = NULL;
+        } /* else if */
+        set_send_status(data, "Connecting...", data->percent, 0);
     } /* if */
 
     if (data->socket == NULL)
@@ -257,7 +265,7 @@ static int MOJOCRASH_random(const int top)
 } /* MOJOCRASH_random */
 
 
-static void send_all_reports(SendReportData *data)
+static void send_all_reports_worker_internal(SendReportData *data)
 {
     int i, j;
 
@@ -412,6 +420,8 @@ static void send_all_reports(SendReportData *data)
                 {
                     if (strncmp(ptr+1, "200 ", 4) == 0)
                         data->h->delete_report(data->app, i);  /* Accepted! */
+                    else
+                        set_send_status(data, "Rejected by server.", 100, -1);
                 } /* if */
             } /* else */
         } /* if */
@@ -426,15 +436,102 @@ static void send_all_reports(SendReportData *data)
 
     if (data->resolved)
         MOJOCRASH_platform_free_dns(data->resolved);
+} /* send_all_reports_worker_internal */
+
+
+typedef struct
+{
+    volatile int copied;
+    const MOJOCRASH_report_hooks *h;
+    const char *app;
+    const char **reports;
+    int total;
+    const char *url;
+    int background;
+} SendReportWorkerData;
+
+static const char *send_all_reports_worker(SendReportWorkerData *workerdata,
+                                           int *success)
+{
+    SendReportData data;
+    data.done = 0;
+    data.background = workerdata->background;
+    data.status = NULL;
+    data.percent = -1;
+    data.h = workerdata->h;
+    data.port = 0;
+    data.app = workerdata->app;
+    data.reports = workerdata->reports;
+    data.total = workerdata->total;
+    data.bytesin = 0;
+    data.bytesout = 0;
+    data.url = workerdata->url;
+    data.use_proxy = 0;
+    data.host[0] = '\0';
+    data.path[0] = '\0';
+    data.socket = NULL;
+    data.resolved = NULL;
+
+    workerdata->copied = 1;
+    send_all_reports_worker_internal(&data);
+    if (!data.done)
+        set_send_status(&data, "All done!", 100, 1);  /* we won. */
+    data.h->free_reports(data.reports, data.total);
+    reporting = 0;
+    *success = (data.done > 0) ? 1 : 0;
+    return data.status;
+} /* send_all_reports_worker */
+
+
+static void send_all_reports_thread(void *_data)
+{
+    SendReportWorkerData *workerdata = (SendReportWorkerData *) _data;
+    int ignored = 0;
+    send_all_reports_worker(workerdata, &ignored);
+} /* send_all_reports_thread */
+
+
+static const char *send_all_reports(const MOJOCRASH_report_hooks *h,
+                                    const char *app, const char **reports,
+                                    const int total, const char *url,
+                                    const int background, int *success)
+{
+    SendReportWorkerData workerdata;
+    workerdata.copied = 0;
+    workerdata.h = h;
+    workerdata.app = app;
+    workerdata.reports = reports;
+    workerdata.total = total;
+    workerdata.url = url;
+    workerdata.background = background;
+
+    if (!background)
+        return send_all_reports_worker(&workerdata, success);
+
+    if (!MOJOCRASH_platform_spin_thread(send_all_reports_thread, &workerdata))
+    {
+        *success = 0;
+        return "Failed to spin thread";
+    } /* if */
+
+    while (!workerdata.copied) { /* spin */ }
+    *success = 1;
+    return "Running in background";
 } /* send_all_reports */
 
 
-static inline void delete_all_reports(const MOJOCRASH_report_hooks *h,
-                                      const char *app, const int total)
+static inline const char *delete_all_reports(const MOJOCRASH_report_hooks *h,
+                                             const char *app,
+                                             const char **reports,
+                                             const int total, int *success)
 {
     int i;
     for (i = 0; i < total; i++)
         h->delete_report(app, i);
+    h->free_reports(reports, total);
+    reporting = 0;
+    *success = 1;
+    return "Reports deleted";
 } /* delete_all_reports */
 
 
@@ -442,45 +539,30 @@ static void handle_reports(const MOJOCRASH_report_hooks *h, const char *app,
                            const char **reports, const int total,
                            const char *url)
 {
-    MOJOCRASH_GuiShowValue rc = 0;
     int success = 0;
     const char *status = NULL;
 
     if (!h->gui_init())
         return;
 
-    rc = h->gui_show(reports, total);
-
-    if (rc == MOJOCRASH_GUISHOW_REJECT)
-        delete_all_reports(h, app, total);
-
-    else if (rc == MOJOCRASH_GUISHOW_SEND)
+    switch (h->gui_show(reports, total))
     {
-        SendReportData data;
-        data.done = 0;
-        data.status = NULL;
-        data.percent = -1;
-        data.h = h;
-        data.port = 0;
-        data.app = app;
-        data.reports = reports;
-        data.total = total;
-        data.bytesin = 0;
-        data.bytesout = 0;
-        data.url = url;
-        data.use_proxy = 0;
-        data.host[0] = '\0';
-        data.path[0] = '\0';
-        data.socket = NULL;
-        data.resolved = NULL;
-        send_all_reports(&data);
-        if (!data.done)
-            set_send_status(&data, "All done!", 100, 1);  /* we won. */
-        success = (data.done > 0) ? 1 : -1;
-        status = data.status;
-    } /* else if */
+        case MOJOCRASH_GUISHOW_REJECT:
+            status = delete_all_reports(h, app, reports, total, &success);
+            break;
+        case MOJOCRASH_GUISHOW_SEND:
+            status = send_all_reports(h, app, reports, total, url, 0, &success);
+            break;
+        case MOJOCRASH_GUISHOW_SEND_BACKGROUND:
+            status = send_all_reports(h, app, reports, total, url, 1, &success);
+            break;
+        case MOJOCRASH_GUISHOW_IGNORE:
+            success = -1;   /* GUI error, etc. Just try again later. */
+            h->free_reports(reports, total);
+            reporting = 0;
+            break;
+    } /* switch */
 
-    /* MOJOCRASH_GUISHOW_IGNORE == GUI error, etc. Just try again later. */
     h->gui_quit(success, status);
 } /* handle_report */
 
@@ -489,12 +571,14 @@ static void report_internal(const MOJOCRASH_report_hooks *h, const char *app,
                             const char *url)
 {
     int total = 0;
-    const char **reports = h->load_reports(app, &total);
+    const char **reports = NULL;
+
+    reporting = 1;
+    reports = h->load_reports(app, &total);
     if (reports != NULL)
     {
         if (total > 0)
             handle_reports(h, app, reports, total, url);
-        h->free_reports(reports, total);
     } /* if */
 } /* report_internal */
 
@@ -559,7 +643,8 @@ static void init_report_hooks(const MOJOCRASH_report_hooks *in,
 void MOJOCRASH_report(const char *appname, const char *url,
                       const MOJOCRASH_report_hooks *h)
 {
-    MOJOCRASH_report_hooks hooks;
+    static MOJOCRASH_report_hooks hooks;
+    if (reporting) return;
     if (appname == NULL) return;
     if (url == NULL) return;
     if (!MOJOCRASH_platform_init()) return;
@@ -567,6 +652,12 @@ void MOJOCRASH_report(const char *appname, const char *url,
     init_report_hooks(h, &hooks);
     report_internal(&hooks, appname, url);
 } /* MOJOCRASH_report */
+
+
+int MOJOCRASH_reporting(void)
+{
+    return reporting;
+} /* MOJOCRASH_reporting */
 
 /* end of mojocrash_report.c ... */
 
