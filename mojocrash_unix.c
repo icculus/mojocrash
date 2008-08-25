@@ -513,6 +513,10 @@ int MOJOCRASH_platform_write_socket(void *sock, const char *buf, const int l)
 
 int MOJOCRASH_platform_init(void)
 {
+    static int already_initialized = 0;
+    if (already_initialized)
+        return 1;
+    already_initialized = 1;
     gettimeofday(&starttime, NULL);
     return MOJOCRASH_unix_init();
 } /* MOJOCRASH_platform_init */
