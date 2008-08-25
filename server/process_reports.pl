@@ -3,14 +3,16 @@
 use warnings;
 use strict;
 use DBI;
+use DateTime::Format::MySQL;
+use DateTime::Format::Epoch::Unix;
+
+my $GTimeZone = 'EST';  # !!! FIXME: get this from the system?
 
 my $dblink = undef;
-my $dbhost, $dbuser, $dbpass, $dbname;
-
-$dbhost = 'localhost';
-$dbuser = 'root';
-$dbpass = '';
-$dbname = 'mojocrash';
+my $dbhost = 'localhost';
+my $dbuser = 'root';
+my $dbpass = '';
+my $dbname = 'mojocrash';
 
 my %apps;
 my %appvers;
@@ -18,6 +20,13 @@ my %plats;
 my %platvers;
 my %cpus;
 my %boguses;
+
+sub epochToMysql {
+    my $epochtime = shift;
+    my $dt = DateTime::Format::Epoch::Unix->parse_datetime($epochtime);
+    $dt->set_time_zone($GTimeZone);
+    return DateTime::Format::MySQL->format_datetime($dt);
+}
 
 # !!! FIXME: grep for 'die' and remove it. This needs to stay up in face of
 # !!! FIXME:  temporary failures, and not take down other threads, too!
@@ -45,12 +54,12 @@ sub add_static_id {
     $id = $link->quote($id);
     my $sql = "insert into $table ($field) values ($id)";
     if (not defined $link->do($sql)) {
-        die("couldn't insert static id: $link->errstr");
+        die("couldn't insert static id: " . $link->errstr);
     }
 
-    $sql = 'select id from $table where ($field=$id) limit 1';
+    $sql = "select id from $table where ($field=$id) limit 1";
     my $sth = $link->prepare($sql);
-    $sth->execute() or die "can't execute the query: $sth->errstr";
+    $sth->execute() or die "can't execute the query: " . $sth->errstr;
     my @row = $sth->fetchrow_array();
     my $retval = $row[0];
     $sth->finish();
@@ -78,9 +87,9 @@ sub poke_bugtracker {
     my $processed_text = '';
 
     my $link = get_database_link();
-    my $sql = 'select id, trackerid from bugtracker_posts where (guid=$guid) limit 1';
+    my $sql = "select id, trackerid from bugtracker_posts where (guid=$guid) limit 1";
     my $sth = $link->prepare($sql);
-    $sth->execute() or die "can't execute the query: $sth->errstr";
+    $sth->execute() or die "can't execute the query: " . $sth->errstr;
     my @row = $sth->fetchrow_array();
     my $newbug = not @row;
     my $postid = $newbug ? 0 : $row[0];
@@ -156,7 +165,7 @@ sub handle_unprocessed_report {
         } elsif ($cmd eq 'MOJOCRASH') {
             # do nothing right now.
         } elsif ($cmd eq 'CRASHLOG_VERSION') {
-            $bogus = 'unrecognized crashlog version';
+            $bogus = 'unrecognized crashlog version' if ($args != 1);
         } elsif ($cmd eq 'APPLICATION_NAME') {
             $appname = $apps{$args};
             $bogus = 'unknown application' if (not defined $appname);
@@ -183,14 +192,14 @@ sub handle_unprocessed_report {
             $uptime = $args;
             $bogus = 'uptime must be an integer' if (not $args =~ /\A\d+\Z/);
         } elsif ($cmd eq 'CRASH_TIME') {
-            $crashtime = $args;
             $bogus = 'crashtime must be an integer' if (not $args =~ /\A\d+\Z/);
-            $args = convert_to_datestring($crashtime);
+            $crashtime = epochToMysql($args);
+            $args = $crashtime;
         } elsif ($cmd eq 'END') {
             $bogus = 'END command with arguments' if ($args ne '');
         } elsif ($cmd eq 'OBJECT') {
             $multiple_okay = 1;
-            if (not $seen{'CALLSTACK'}) {
+            if ($seen{'CALLSTACK'}) {
                 $bogus = 'OBJECT after CALLSTACK';
             } elsif (not $cmd =~ /\A(.*?)\/(\d+)\/(\d+)\Z/) {
                 $bogus = 'invalid OBJECT format';
@@ -285,7 +294,7 @@ sub handle_unprocessed_report {
             $boguses{$bogus} = $bogusid;
         }
         $sql = "update reports set status=-1, bogus_line=$line," .
-               " bogus_reason=$bogusid where id=$id";
+               " bogus_reason_id=$bogusid where id=$id";
     } else {
         $processed_text = $link->quote($processed_text);
         $sql = "update reports set status=1, bugtracker_entry=$postid," .
@@ -302,10 +311,10 @@ sub handle_unprocessed_report {
 sub load_static_id_hash {
     my ($hashref, $table, $field) = @_;
     my $link = get_database_link();
-    my $sql = 'select id, $field from $table';
+    my $sql = "select id, $field from $table";
     my $sth = $link->prepare($sql);
-    $sth->execute() or die "can't execute the query: $sth->errstr";
-    $$hashref = ();
+    $sth->execute() or die "can't execute the query: " . $sth->errstr;
+    $hashref = {};
     while (my @row = $sth->fetchrow_array()) {
         $$hashref{$row[1]} = $row[0];
     }
@@ -326,7 +335,7 @@ sub run_unprocessed {
     my $link = get_database_link();
     my $sql = 'select id, unprocessed_text from reports where (status=0)';
     my $sth = $link->prepare($sql);
-    $sth->execute() or die "can't execute the query: $sth->errstr";
+    $sth->execute() or die "can't execute the query: " . $sth->errstr;
     while (my @row = $sth->fetchrow_array()) {
         # !!! FIXME: push to a queue that worker threads pull from.
         handle_unprocessed_report($row[0], $row[1]);
