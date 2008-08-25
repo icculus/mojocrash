@@ -293,6 +293,16 @@ void MOJOCRASH_platform_free_reports(const char **reports, const int total)
 } /* MOJOCRASH_platform_free_reports */
 
 
+int MOJOCRASH_platform_spin_thread(void (*fn)(void *), void *arg)
+{
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, (void *(*)(void *))fn, arg) != 0)
+        return 0;
+    pthread_detach(thread);
+    return 1;
+} /* MOJOCRASH_platform_spin_thread */
+
+
 typedef struct DnsResolve
 {
     char *host;
@@ -314,7 +324,7 @@ static void free_dns(DnsResolve *dns)
 } /* free_dns */
 
 
-static void *dns_resolver_thread(void *_dns)
+static void dns_resolver_thread(void *_dns)
 {
     char portstr[64];
     int app_done = 0;
@@ -334,16 +344,14 @@ static void *dns_resolver_thread(void *_dns)
     /* we free if the app is done, otherwise, app will do it. */
     if (app_done)
         free_dns(dns);
+} /* dns_resolver_thread */
 
-    return NULL;  /* we're detached anyhow. */
-} /* dns_resolve */
 
 
 void *MOJOCRASH_platform_begin_dns(const char *host, const int port)
 {
     DnsResolve *retval = NULL;
     int mutex_initted = 0;
-    pthread_t thread;
 
     retval = (DnsResolve *) malloc(sizeof (DnsResolve));
     if (retval == NULL)
@@ -363,9 +371,8 @@ void *MOJOCRASH_platform_begin_dns(const char *host, const int port)
     retval->status = 0;
     retval->app_done = 0;
 
-    if (pthread_create(&thread, NULL, dns_resolver_thread, retval) != 0)
+    if (!MOJOCRASH_platform_spin_thread(dns_resolver_thread, retval))
         goto begin_dns_failed;
-    pthread_detach(thread);
 
     return retval;
 
