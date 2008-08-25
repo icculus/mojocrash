@@ -155,7 +155,7 @@ static int resolve_server_address(SendReportData *data)
     else
         data->port = 80;
 
-    data->resolved = MOJOCRASH_platform_begin_dns(data->host, data->port);
+    data->resolved = MOJOCRASH_platform_begin_dns(data->host, data->port, 0);
     while (1)
     {
         set_send_status(data, "Looking up hostname...", -1, 0);

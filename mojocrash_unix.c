@@ -347,8 +347,8 @@ static void dns_resolver_thread(void *_dns)
 } /* dns_resolver_thread */
 
 
-
-void *MOJOCRASH_platform_begin_dns(const char *host, const int port)
+void *MOJOCRASH_platform_begin_dns(const char *host, const int port,
+                                   const int block)
 {
     DnsResolve *retval = NULL;
     int mutex_initted = 0;
@@ -369,10 +369,15 @@ void *MOJOCRASH_platform_begin_dns(const char *host, const int port)
     retval->port = port;
     retval->addr = NULL;
     retval->status = 0;
-    retval->app_done = 0;
+    retval->app_done = block;
 
-    if (!MOJOCRASH_platform_spin_thread(dns_resolver_thread, retval))
-        goto begin_dns_failed;
+    if (block)
+        dns_resolver_thread(retval);
+    else
+    {
+        if (!MOJOCRASH_platform_spin_thread(dns_resolver_thread, retval))
+            goto begin_dns_failed;
+    } /* else */
 
     return retval;
 
