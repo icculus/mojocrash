@@ -58,8 +58,10 @@ function process_report()
     global $max_file_size;
 
     $ua = 'mojocrash/';
-//    if (strncmp($_SERVER['HTTP_USER_AGENT'], $ua, strlen($ua)) != 0)
-//        return;  // ignore things that definitely aren't MojoCrash clients.
+    if (strncmp($_SERVER['HTTP_USER_AGENT'], $ua, strlen($ua)) != 0)
+        return;  // ignore things that definitely aren't MojoCrash clients.
+
+    foreach ($_FILES as $key => $val) { echo "$key<br/>\n"; }
 
     $file = $_FILES['crash'];
     if (!isset($file))
@@ -84,7 +86,7 @@ function process_report()
            " values ($ipaddr, NOW(), $str)";
     $str = '';
     if (mysql_query($sql, $dblink) == false)
-        fail('database write failure');
+        fail('database write failure: ' . mysql_error());
 } // process_report
 
 
