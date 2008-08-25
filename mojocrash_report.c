@@ -442,7 +442,7 @@ static void handle_reports(const MOJOCRASH_report_hooks *h, const char *app,
                            const char **reports, const int total,
                            const char *url)
 {
-    int rc = 0;
+    MOJOCRASH_GuiShowValue rc = 0;
     int success = 0;
     const char *status = NULL;
 
@@ -451,10 +451,10 @@ static void handle_reports(const MOJOCRASH_report_hooks *h, const char *app,
 
     rc = h->gui_show(reports, total);
 
-    if (rc == 0)  /* 0 == refuse send. */
+    if (rc == MOJOCRASH_GUISHOW_REJECT)
         delete_all_reports(h, app, total);
 
-    else if (rc == 1)  /* 1 == confirm send. */
+    else if (rc == MOJOCRASH_GUISHOW_SEND)
     {
         SendReportData data;
         data.done = 0;
@@ -480,7 +480,7 @@ static void handle_reports(const MOJOCRASH_report_hooks *h, const char *app,
         status = data.status;
     } /* else if */
 
-    /* < 0 is GUI error, etc. Just try again later. */
+    /* MOJOCRASH_GUISHOW_IGNORE == GUI error, etc. Just try again later. */
     h->gui_quit(success, status);
 } /* handle_report */
 
@@ -523,9 +523,10 @@ static int defhook_gui_init(void)
 } /* defhook_gui_init */
 
 
-static int defhook_gui_show(const char **reports, const int total)
+static MOJOCRASH_GuiShowValue defhook_gui_show(const char **reports,
+                                               const int total)
 {
-    return 1;  /* oh well. */
+    return MOJOCRASH_GUISHOW_SEND;  /* oh well. */
 } /* defhook_gui_show */
 
 

@@ -47,6 +47,12 @@ int MOJOCRASH_install(const char *appname, const char *version,
                       const MOJOCRASH_hooks *hooks);
 
 
+typedef enum
+{
+    MOJOCRASH_GUISHOW_IGNORE,
+    MOJOCRASH_GUISHOW_REJECT,
+    MOJOCRASH_GUISHOW_SEND,
+} MOJOCRASH_GuiShowValue;
 
 typedef struct MOJOCRASH_report_hooks
 {
@@ -54,7 +60,7 @@ typedef struct MOJOCRASH_report_hooks
     void (*delete_report)(const char *appname, const int idx);
     void (*free_reports)(const char **reports, const int total);
     int (*gui_init)(void);
-    int (*gui_show)(const char **reports, const int total);
+    MOJOCRASH_GuiShowValue (*gui_show)(const char **reports, const int total);
     int (*gui_status)(const char *statustext, int percent);
     void (*gui_quit)(const int success, const char *statustext);
 } MOJOCRASH_report_hooks;

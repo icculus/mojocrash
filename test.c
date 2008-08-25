@@ -30,7 +30,8 @@ static int report_gui_init(void)
     return 1;
 } /* report_gui_init */
 
-static int report_gui_show(const char **reports, const int total)
+static MOJOCRASH_GuiShowValue report_gui_show(const char **reports,
+                                              const int total)
 {
     int i;
     printf("Called %s(%p, %d)\n", __FUNCTION__, reports, total);
@@ -45,7 +46,7 @@ static int report_gui_show(const char **reports, const int total)
 
         printf("Send them? [yes/no/later]\n> ");
         if (!fgets(buf, sizeof (buf), stdin))
-            return -1;
+            return MOJOCRASH_GUISHOW_IGNORE;
 
         ptr = buf + (strlen(buf) - 1);
         while (ptr > buf)
@@ -57,14 +58,14 @@ static int report_gui_show(const char **reports, const int total)
         } /* while */
 
         if (strcmp(buf, "yes") == 0)
-            return 1;
+            return MOJOCRASH_GUISHOW_SEND;
         else if (strcmp(buf, "no") == 0)
-            return 0;
+            return MOJOCRASH_GUISHOW_REJECT;
         else if (strcmp(buf, "later") == 0)
-            return -1;
+            return MOJOCRASH_GUISHOW_IGNORE;
     } /* while */
 
-    return 1;
+    return MOJOCRASH_GUISHOW_IGNORE;
 } /* report_gui_show */
 
 static int report_gui_status(const char *statustext, int percent)
