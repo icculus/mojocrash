@@ -11,6 +11,8 @@ typedef struct
     const char *app;
     const char **reports;
     int total;
+    int bytesin;
+    int bytesout;
     const char *url;
     int use_proxy;
     char host[128];
@@ -218,19 +220,54 @@ static inline int percent(const int x, const int total)
 } /* percent */
 
 
+static void write_string(SendReportData *data, const char *str, const int len,
+                         const int updatepct)
+{
+    int bw = 0;
+    int rc = 0;
+    int pct = percent(data->bytesout, data->bytesin);
+
+    while ((bw < len) && (!data->done))
+    {
+        set_send_status(data, "Sending...", pct, 0);
+        rc = MOJOCRASH_platform_write_socket(data->socket, str+bw, len-bw);
+        if (rc == -1)
+            set_send_status(data, "Network write failure.", 100, -1);
+        else if (rc == 0)
+            set_send_status(data, "Connection lost.", 100, -1);
+        else if (rc > 0)
+        {
+            bw += rc;
+            if (updatepct)
+            {
+                data->bytesout += rc;
+                pct = percent(data->bytesout, data->bytesin);
+            } /* if */
+        } /* if */
+    } /* while */
+} /* write_string */
+
+
+static unsigned long MOJOCRASH_random_seed = 1;
+static int MOJOCRASH_random(const int top)
+{
+    /* !!! FIXME: this is NOT a good algorithm. */
+    MOJOCRASH_random_seed = (MOJOCRASH_random_seed * 1103515245) + 12345;
+    return (int) ((unsigned)(MOJOCRASH_random_seed / 65536) % top);
+} /* MOJOCRASH_random */
+
+
 static void send_all_reports(SendReportData *data)
 {
     int i, j;
-    int bytesout = 0;
-    int bytesin = 0;
 
     for (i = 0; i < data->total; i++)
     {
         set_send_status(data, "Starting up...", -1, 0);
-        bytesin += strlen(data->reports[i]);
+        data->bytesin += strlen(data->reports[i]);
     } /* for */
 
-    if (bytesin == 0)  /* nothing to do? */
+    if (data->bytesin == 0)  /* nothing to do? */
     {
         data->done = 1;
         return;
@@ -240,13 +277,15 @@ static void send_all_reports(SendReportData *data)
     {
         char numcvt[32];
         char intro[1024];
-        int introlen = 0;
+        char boundary[32];
+        char prologue[256];
+        char epilogue[64];
         char *str = NULL;
         int avail = 0;
         const char *report = data->reports[i];
         const int len = strlen(report);
-        int bw = 0;
         int rc = 0;
+        int x = 0;
 
         if (len == 0)   /* nothing to do? */
         {
@@ -258,10 +297,38 @@ static void send_all_reports(SendReportData *data)
         if (!server_connect(data))
             break;  /* error message was set elsewhere. */
 
+        for (x = 0; x < sizeof (boundary) - 1; x++)
+        {
+            if (MOJOCRASH_random(10) % 2)
+                boundary[x] = ('0' + MOJOCRASH_random(10));
+            else
+                boundary[x] = ('a' + MOJOCRASH_random(26));
+        } /* for */
+        boundary[x] = '\0';
+
+        str = prologue;
+        avail = sizeof (prologue);
+        MOJOCRASH_StringAppend(&str, &avail, "--");
+        MOJOCRASH_StringAppend(&str, &avail, boundary);
+        MOJOCRASH_StringAppend(&str, &avail,
+            "\r\n"
+            "Content-Disposition: form-data; name=\"crash\";"
+            " filename=\"crash-report.txt\"\r\n"
+            "Content-Type: text/plain; charset=utf-8\r\n\r\n"
+        );
+
+        str = epilogue;
+        avail = sizeof (epilogue);
+        MOJOCRASH_StringAppend(&str, &avail, "\r\n--");
+        MOJOCRASH_StringAppend(&str, &avail, boundary);
+        MOJOCRASH_StringAppend(&str, &avail, "--\r\n");
+
+        MOJOCRASH_ULongToString(
+            ((unsigned long) len) + strlen(prologue) + strlen(epilogue),
+            numcvt);
+
         str = intro;
         avail = sizeof (intro);
-        MOJOCRASH_ULongToString((unsigned long) len, numcvt);
-
         if (data->use_proxy)
         {
             MOJOCRASH_StringAppend(&str, &avail, "POST ");
@@ -283,42 +350,19 @@ static void send_all_reports(SendReportData *data)
         MOJOCRASH_StringAppend(&str, &avail, "Accept: text/plain\r\n");
         MOJOCRASH_StringAppend(&str, &avail, "Accept-Charset: utf-8\r\n");
         MOJOCRASH_StringAppend(&str, &avail, "Connection: close\r\n");
-        MOJOCRASH_StringAppend(&str, &avail, "Content-Type: text/plain; charset=utf-8\r\n");
+        MOJOCRASH_StringAppend(&str, &avail,
+            "Content-Type: multipart/form-data; boundary=\""
+        );
+        MOJOCRASH_StringAppend(&str, &avail, boundary);
+        MOJOCRASH_StringAppend(&str, &avail, "\"\r\n");
         MOJOCRASH_StringAppend(&str, &avail, "Content-Length: ");
         MOJOCRASH_StringAppend(&str, &avail, numcvt);
         MOJOCRASH_StringAppend(&str, &avail, "\r\n\r\n");
-        introlen = strlen(intro);
 
-        bw = 0;
-        while ((bw < introlen) && (!data->done))
-        {
-            set_send_status(data, "Sending...", percent(bytesout, bytesin), 0);
-            rc = MOJOCRASH_platform_write_socket(data->socket, intro + bw,
-                                                 introlen - bw);
-            if (rc == -1)
-                set_send_status(data, "Network write failure.", 100, -1);
-            else if (rc == 0)
-                set_send_status(data, "Connection lost.", 100, -1);
-            else if (rc > 0)
-                bw += rc;
-        } /* while */
-
-        bw = 0;
-        while ((bw < len) && (!data->done))
-        {
-            set_send_status(data, "Sending...", percent(bytesout, bytesin), 0);
-            rc = MOJOCRASH_platform_write_socket(data->socket, report + bw,
-                                                 len - bw);
-            if (rc == -1)
-                set_send_status(data, "Network write failure.", 100, -1);
-            else if (rc == 0)
-                set_send_status(data, "Connection lost.", 100, -1);
-            else if (rc > 0)
-            {
-                bw += rc;
-                bytesout += rc;
-            } /* if */
-        } /* while */
+        write_string(data, intro, strlen(intro), 0);
+        write_string(data, prologue, strlen(prologue), 0);
+        write_string(data, report, len, 1);
+        write_string(data, epilogue, strlen(epilogue), 0);
 
         if (!data->done)  /* entire message was sent? */
         {
@@ -421,6 +465,8 @@ static void handle_reports(const MOJOCRASH_report_hooks *h, const char *app,
         data.app = app;
         data.reports = reports;
         data.total = total;
+        data.bytesin = 0;
+        data.bytesout = 0;
         data.url = url;
         data.use_proxy = 0;
         data.host[0] = '\0';
@@ -515,6 +561,8 @@ void MOJOCRASH_report(const char *appname, const char *url,
     MOJOCRASH_report_hooks hooks;
     if (appname == NULL) return;
     if (url == NULL) return;
+    if (!MOJOCRASH_platform_init()) return;
+    MOJOCRASH_random_seed = MOJOCRASH_platform_now();
     init_report_hooks(h, &hooks);
     report_internal(&hooks, appname, url);
 } /* MOJOCRASH_report */
