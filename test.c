@@ -10,6 +10,14 @@
 #define APPVERSION "1.0"
 #define REPORTURL "http://127.0.0.1/test/crashreport.php"
 
+#ifdef _WINDOWS
+#define WIN32_LEAN_AND_MEAN 1
+#include <windows.h>
+static inline void doSleep(const int ms) { Sleep(ms); }
+#else
+static inline void doSleep(const int ms) { usleep(ms * 1000); }
+#endif
+
 void f4() { printf("crashing!\n"); fflush(stdout); abort(); } //*((int *)0) = 0; }
 void f3() { f4(); }
 void f2() { f3(); }
@@ -78,6 +86,8 @@ static int report_gui_status(const char *statustext, int percent)
         strcpy(buf, statustext);
         printf("Called %s('%s', %d)\n", __FUNCTION__, statustext, percent);
     } /* if */
+
+    doSleep(10);
     return 1;
 } /* report_gui_status */
 
