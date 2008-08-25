@@ -5,11 +5,12 @@ use strict;
 use DBI;
 
 my $dblink = undef;
-my $dbhost = 'localhost';
-my $dbuser = 'root';
-my $dbpass = undef;
-my $dbpassfile = 'dbpass.txt';
-my $dbname = 'mojocrash';
+my $dbhost, $dbuser, $dbpass, $dbname;
+
+$dbhost = 'localhost';
+$dbuser = 'root';
+$dbpass = '';
+$dbname = 'mojocrash';
 
 my %apps;
 my %appvers;
@@ -24,15 +25,7 @@ my %boguses;
 sub get_database_link {
     if (not defined $dblink) {
         if (not defined $dbpass) {
-            if (defined $dbpassfile) {
-                open(FH, $dbpassfile)
-                    or report_fatal("failed to open $dbpassfile: $!");
-                $dbpass = <FH>;
-                chomp($dbpass);
-                $dbpass =~ s/\A\s*//;
-                $dbpass =~ s/\s*\Z//;
-                close(FH);
-            }
+            return undef;
         }
 
         my $dsn = "DBI:mysql:database=$dbname;host=$dbhost";
@@ -103,11 +96,11 @@ sub poke_bugtracker {
 
     $report .= "MojoCrash report #$id, post #$postid, guid $guid\n";
 
-    foreach (keys $cmdargsref) {
+    foreach (keys %$$cmdargsref) {
         $report .= $_ . ': ' . $$cmdargsref[$_] . "\n";
     }
 
-    foreach (keys $$etcsref) {
+    foreach (keys %$$etcsref) {
         $report .= "\nETC_KEY: $_\n" . 'ETC_VALUE: ' . $$etcsref[$_] . "\n";
     }
 
@@ -142,9 +135,9 @@ sub handle_unprocessed_report {
     my $etckey;
     my %seen;
 
-    my @lines = split(/(\r\n|\r|\n)/, $text);
-    foreach (@lines) {
-        $lines++;
+    my @textlines = split(/(\r\n|\r|\n)/, $text);
+    foreach (@textlines) {
+        $line++;
 
         my $multiple_okay = 0;
         s/\A\s+//;
@@ -206,7 +199,7 @@ sub handle_unprocessed_report {
                 if (defined $objs{$obj}) {
                     $bogus = 'same OBJECT more than once';
                 } else {
-                    $objs{$obj} = ( $addr, $len );
+                    $objs{$obj} = [ $addr, $len ];
                 }
             }
         } elsif ($cmd eq 'CALLSTACK') {
@@ -245,7 +238,7 @@ sub handle_unprocessed_report {
 
         last if (defined $bogus);  # something failed, so stop.
 
-        $cmdargs{$cmd} = $args if (!multiple_okay);
+        $cmdargs{$cmd} = $args if (!$multiple_okay);
         $lastcmd = $cmd;
         $seen{$cmd} = 1;
     }
