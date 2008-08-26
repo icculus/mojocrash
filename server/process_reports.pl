@@ -5,6 +5,7 @@ use strict;
 use DBI;
 use DateTime::Format::MySQL;
 use DateTime::Format::Epoch::Unix;
+use Digest::SHA1 qw(sha1_hex);
 
 my $GTimeZone = 'EST';  # !!! FIXME: get this from the system?
 
@@ -144,7 +145,22 @@ sub handle_unprocessed_report {
     my %etcs = ();
     my %seen = ();
 
-    my @textlines = split(/(\r\n|\r|\n)/, $text);
+    # !!! FIXME: race condition, if two NEW reports match in two threads.
+    my $checksum = sha1_hex($text);
+    my $link = get_database_link();
+    my $sql = "select id from reports where checksum='$checksum' limit 1";
+    my $sth = $link->prepare($sql);
+    $sth->execute() or die "can't execute the query: " . $sth->errstr;
+    my @row = $sth->fetchrow_array();
+    $bogus = 'Duplicate bug report' if (@row);
+    $sth->finish();
+    @row = undef;
+
+    my @textlines = ();
+    if (not defined $bogus) {
+        @textlines = split(/(\r\n|\r|\n)/, $text);
+    }
+
     foreach (@textlines) {
         $line++;
 
@@ -283,12 +299,9 @@ sub handle_unprocessed_report {
         #  first, we need to convert the stack into source files and line
         #  numbers.
         my $processed_callstack = convert_callstack(\@callstack, \%objs);
-        $guid = sha1($appname . $appver . $processed_callstack);
+        $guid = sha1_hex($appname . $appver . $processed_callstack);
         ($processed_text, $postid) = poke_bugtracker($guid, $processed_callstack, \%cmdargs, \%etcs);
     }
-
-    my $link = get_database_link();
-    my $sql = undef;
 
     if (defined $bogus) {  # FAIL!
         # In theory, there are a finite number of these, all listed in the
@@ -302,12 +315,14 @@ sub handle_unprocessed_report {
         $sql = "update reports set status=-1, bogus_line=$line," .
                " bogus_reason_id=$bogusid where id=$id";
     } else {
+        $checksum = $link->quote($checksum);
         $processed_text = $link->quote($processed_text);
         $sql = "update reports set status=1, bugtracker_entry=$postid," .
-               " processed_text=$processed_text app_id=$appname," .
-               " platform_id=$platname, platform_version_id=$platver," .
-               " cpuarch_id=$cpuname, crashsignal=$signal," .
-               " crashtime=$crashtime, uptime=$uptime where id=$id";
+               " checksum=$checksum, processed_text=$processed_text," .
+               " app_id=$appname, platform_id=$platname," .
+               " platform_version_id=$platver, cpuarch_id=$cpuname, " .
+               " crashsignal=$signal, crashtime=$crashtime," .
+               " uptime=$uptime where id=$id";
     }
 
     $link->do($sql);

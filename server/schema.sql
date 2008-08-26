@@ -66,6 +66,7 @@ create table reports (
     status int not null default 0, -- 0==unprocessed, 1==processed, -1==bogus.
 
     -- everything below here isn't filled in until report is processed.
+    checksum char(40), -- SHA1 of unprocessed_text, for duplicate checks.
     bogus_line int unsigned,
     bogus_reason_id int unsigned,
     bugtracker_post int unsigned,
