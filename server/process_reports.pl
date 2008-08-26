@@ -22,6 +22,11 @@ my %platvers;
 my %cpus;
 my %boguses;
 
+sub SHA1 {
+    my $str = shift;
+    return sha1_hex($str);
+}
+
 sub epochToMysql {
     my $epochtime = shift;
     my $dt = DateTime::Format::Epoch::Unix->parse_datetime($epochtime);
@@ -146,7 +151,7 @@ sub handle_unprocessed_report {
     my %seen = ();
 
     # !!! FIXME: race condition, if two NEW reports match in two threads.
-    my $checksum = sha1_hex($text);
+    my $checksum = SHA1($text);
     my $link = get_database_link();
     my $sql = "select id from reports where checksum='$checksum' limit 1";
     my $sth = $link->prepare($sql);
@@ -299,7 +304,7 @@ sub handle_unprocessed_report {
         #  first, we need to convert the stack into source files and line
         #  numbers.
         my $processed_callstack = convert_callstack(\@callstack, \%objs);
-        $guid = sha1_hex($appname . $appver . $processed_callstack);
+        $guid = SHA1($appname . $appver . $processed_callstack);
         ($processed_text, $postid) = poke_bugtracker($guid, $processed_callstack, \%cmdargs, \%etcs);
     }
 
