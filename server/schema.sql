@@ -69,7 +69,7 @@ create table reports (
     checksum char(40), -- SHA1 of unprocessed_text, for duplicate checks.
     bogus_line int unsigned,
     bogus_reason_id int unsigned,
-    bugtracker_post int unsigned,
+    bugtracker_post_id int unsigned,
     processed_text mediumtext,
     app_id int unsigned,
     platform_id int unsigned,

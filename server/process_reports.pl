@@ -93,7 +93,8 @@ sub poke_bugtracker {
     my $processed_text = '';
 
     my $link = get_database_link();
-    my $sql = "select id, trackerid from bugtracker_posts where (guid=$guid) limit 1";
+    my $sqlguid = $link->quote($guid);
+    my $sql = "select id, trackerid from bugtracker_posts where (guid=$sqlguid) limit 1";
     my $sth = $link->prepare($sql);
     $sth->execute() or die "can't execute the query: " . $sth->errstr;
     my @row = $sth->fetchrow_array();
@@ -111,12 +112,12 @@ sub poke_bugtracker {
 
     $report .= "MojoCrash report #$id, post #$postid, guid $guid\n";
 
-    foreach (keys %$$cmdargsref) {
-        $report .= $_ . ': ' . $$cmdargsref[$_] . "\n";
+    foreach (sort keys %$cmdargsref) {
+        $report .= $_ . ': ' . $$cmdargsref{$_} . "\n";
     }
 
-    foreach (keys %$$etcsref) {
-        $report .= "\nETC_KEY: $_\n" . 'ETC_VALUE: ' . $$etcsref[$_] . "\n";
+    foreach (keys %$etcsref) {
+        $report .= "\nETC_KEY: $_\n" . 'ETC_VALUE: ' . $$etcsref{$_} . "\n";
     }
 
     $report .= "\n\n";
@@ -125,6 +126,19 @@ sub poke_bugtracker {
     $trackerid = poke_bugzilla($newbug, $report, $trackerid);
         
     return ($report, $trackerid);
+}
+
+
+sub convert_callstack {
+    my $callstackref = shift;
+    my $objsref = shift;
+    my $retval = '';
+
+    # !!! FIXME: this needs to do the addr2line magic.
+    foreach (@$callstackref) {
+        $retval .= "$_\n";
+    }
+    return $retval;
 }
 
 
@@ -245,7 +259,7 @@ sub handle_unprocessed_report {
             } elsif (not $args =~ /\A\d+\Z/) {
                 $bogus = 'callstack must be an integer';
             } else {
-                unshift @callstack, $args;  # can't push; it's reverse order.
+                push @callstack, $args;
             }
         } elsif ($cmd eq 'ETC_KEY') {
             $multiple_okay = 1;
@@ -274,7 +288,7 @@ sub handle_unprocessed_report {
 
         last if (defined $bogus);  # something failed, so stop.
 
-        $cmdargs{$cmd} = $args if (!$multiple_okay);
+        $cmdargs{$cmd} = $args if ((!$multiple_okay) and ($cmd ne 'END'));
         $lastcmd = $cmd;
         $seen{$cmd} = 1;
     }
@@ -305,7 +319,8 @@ sub handle_unprocessed_report {
         #  numbers.
         my $processed_callstack = convert_callstack(\@callstack, \%objs);
         $guid = SHA1($appname . $appver . $processed_callstack);
-        ($processed_text, $postid) = poke_bugtracker($guid, $processed_callstack, \%cmdargs, \%etcs);
+        ($processed_text, $postid) = poke_bugtracker($id, $guid, $processed_callstack, \%cmdargs, \%etcs);
+    my ($id, $guid, $stack, $cmdargsref, $etcsref) = @_;
     }
 
     if (defined $bogus) {  # FAIL!
@@ -322,7 +337,8 @@ sub handle_unprocessed_report {
     } else {
         $checksum = $link->quote($checksum);
         $processed_text = $link->quote($processed_text);
-        $sql = "update reports set status=1, bugtracker_entry=$postid," .
+        $crashtime = $link->quote($crashtime);
+        $sql = "update reports set status=1, bugtracker_post_id=$postid," .
                " checksum=$checksum, processed_text=$processed_text," .
                " app_id=$appname, platform_id=$platname," .
                " platform_version_id=$platver, cpuarch_id=$cpuname, " .
