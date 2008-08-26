@@ -573,10 +573,10 @@ static void report_internal(const MOJOCRASH_report_hooks *h, const char *app,
     int total = 0;
     const char **reports = NULL;
 
-    reporting = 1;
     reports = h->load_reports(app, &total);
     if (reports != NULL)
     {
+        reporting = 1;
         if (total > 0)
             handle_reports(h, app, reports, total, url);
     } /* if */
