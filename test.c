@@ -112,7 +112,7 @@ void report(void)
     {
         printf("Waiting for reporting to finish...\n");
         while (MOJOCRASH_reporting())
-            doSleep(10000);
+            doSleep(10);
     } /* if */
 } /* report */
 
