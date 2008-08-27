@@ -32,7 +32,7 @@ static MOJOCRASH_sighandler orig_SIGFPE_handler = NULL;
 static MOJOCRASH_sighandler orig_SIGILL_handler = NULL;
 static MOJOCRASH_sighandler orig_SIGABRT_handler = NULL;
 
-int MOJOCRASH_platform_install_crash_catcher(void (*catcher)(int sig))
+int MOJOCRASH_platform_install_crash_catcher(MOJOCRASH_catcher catcher)
 {
     #define INSTALL_SIGHANDLER(x) orig_##x##_handler = signal(x, catcher)
     INSTALL_SIGHANDLER(SIGSEGV);
