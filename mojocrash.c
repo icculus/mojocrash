@@ -219,7 +219,7 @@ static int callstack_callback(const void *addr)
 } /* callstack_callback */
 
 static int objects_callback(const char *fname, const void *addr,
-                            unsigned long len)
+                            unsigned long len, unsigned long slide)
 {
     char *str = scratch;
     int avail = sizeof (scratch);
@@ -230,6 +230,8 @@ static int objects_callback(const char *fname, const void *addr,
     MOJOCRASH_StringAppend(&str, &avail, MOJOCRASH_PtrToString(addr, numcvt));
     MOJOCRASH_StringAppend(&str, &avail, "/");
     MOJOCRASH_StringAppend(&str, &avail, MOJOCRASH_ULongToString(len, numcvt));
+    MOJOCRASH_StringAppend(&str, &avail, "/");
+    MOJOCRASH_StringAppend(&str, &avail, MOJOCRASH_ULongToString(slide,numcvt));
     return hooks.new_crashlog_line(scratch);
 } /* objects_callback */
 

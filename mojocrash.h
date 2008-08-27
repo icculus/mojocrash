@@ -25,7 +25,8 @@ extern "C" {
 typedef void (*MOJOCRASH_catcher)(int sig);
 typedef int (*MOJOCRASH_get_callstack_callback)(const void *addr);
 typedef int (*MOJOCRASH_get_objects_callback)(const char *fname,
-                                          const void *addr, unsigned long len);
+                                          const void *addr, unsigned long len,
+                                          unsigned long slide);
 typedef int (*MOJOCRASH_get_etc_callback)(const char *key, const char *value);
 
 typedef struct MOJOCRASH_hooks

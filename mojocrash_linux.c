@@ -72,7 +72,7 @@ static int glibc_dl_iterate(struct dl_phdr_info *info, size_t size, void *data)
         {
             void *addr = (void *) (info->dlpi_addr+info->dlpi_phdr[i].p_vaddr);
             unsigned long len = info->dlpi_phdr[i].p_memsz;
-            if (!cb(name, addr, len))
+            if (!cb(name, addr, len, 0))
                 return 1;  /* stop! */
         } /* else */
     } /* for */

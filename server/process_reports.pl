@@ -242,14 +242,14 @@ sub handle_unprocessed_report {
             $multiple_okay = 1;
             if ($seen{'CALLSTACK'}) {
                 $bogus = 'OBJECT after CALLSTACK';
-            } elsif (not $args =~ /\A(.*?)\/(\d+)\/(\d+)\Z/) {
+            } elsif (not $args =~ /\A(.*?)\/(\d+)\/(\d+)\/(\d+)\Z/) {
                 $bogus = 'invalid OBJECT format';
             } else {
-                my ($obj, $addr, $len) = ( $1, $2, $3 );
+                my ($obj, $addr, $len, $slide) = ( $1, $2, $3, $4 );
                 if (defined $objs{$obj}) {
                     $bogus = 'same OBJECT more than once';
                 } else {
-                    $objs{$obj} = [ $addr, $len ];
+                    $objs{$obj} = [ $addr, $len, $slide ];
                 }
             }
         } elsif ($cmd eq 'CALLSTACK') {

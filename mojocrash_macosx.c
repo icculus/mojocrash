@@ -171,6 +171,7 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
     {
         const char *path = fname_without_dirs(_dyld_get_image_name(i));
         const MachHeader *header = (MachHeader *) _dyld_get_image_header(i);
+        const intptr_t slide = _dyld_get_image_vmaddr_slide(i);
         const void *addr = header;
         const char *ptr = ((char *) addr) + sizeof (MachHeader);
         unsigned long len = 0;
@@ -191,7 +192,7 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
             len += (unsigned long) cmd->vmsize;
         } /* for */
 
-        if (!cb(path, addr, len))
+        if (!cb(path, addr, len, (unsigned long) slide))
             return 0;  /* stop! */
     } /* for */
 
