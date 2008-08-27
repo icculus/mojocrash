@@ -22,6 +22,7 @@ SET(MOJOCRASH_SRCS
     mojocrash_unix.c
     mojocrash_macosx.c
     mojocrash_linux.c
+    mojocrash_windows.c
 )
 
 ADD_EXECUTABLE(test test.c ${MOJOCRASH_SRCS})

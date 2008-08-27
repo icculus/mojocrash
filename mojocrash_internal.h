@@ -65,6 +65,17 @@ char *MOJOCRASH_ULongToString(unsigned long num, char *str);
 char *MOJOCRASH_LongToString(long num, char *str);
 char *MOJOCRASH_PtrToString(const void *ptr, char *str);
 
+/* naturally, GCC and MSVC do this differently... */
+#if (defined __GNUC__)
+#define CONST_SI64(x) x##LL
+#define CONST_UI64(x) x##ULL
+#elif (defined _MSC_VER)
+#define CONST_SI64(x) x##i64
+#define CONST_UI64(x) x##ui64
+#else
+#error Please define your platform.
+#endif
+
 
 /* helper macro for counting items in a static array. */
 #define STATICARRAYLEN(x) (sizeof (x) / sizeof ((x)[0]))
