@@ -520,22 +520,22 @@ int MOJOCRASH_platform_get_http_proxy(char *buf, const int buflen)
 
 typedef struct
 {
-    void (*fn)(void *);
+    MOJOCRASH_thread_entry fn;
     void *arg;
     volatile int done;
 } thread_data;
 
-static DWORD WINAPI thread_bridge(LPVOID arg)
+static DWORD WINAPI thread_bridge(LPVOID _arg)
 {
-    thread_data *data = (thread_data *) arg;
-    void (*fn)(void *) = data->fn;
+    thread_data *data = (thread_data *) _arg;
+    MOJOCRASH_thread_entry fn = data->fn;
     void *arg = data->arg;
     data->done = 1;
     fn(arg);
     return 0;
 } /* thread_bridge */
 
-int MOJOCRASH_platform_spin_thread(void (*fn)(void *), void *arg)
+int MOJOCRASH_platform_spin_thread(MOJOCRASH_thread_entry fn, void *arg)
 {
     thread_data data = { fn, arg, 0 };
     HANDLE h = CreateThread(NULL, 0, thread_bridge, &data);

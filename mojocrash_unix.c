@@ -293,12 +293,31 @@ void MOJOCRASH_platform_free_reports(const char **reports, const int total)
 } /* MOJOCRASH_platform_free_reports */
 
 
-int MOJOCRASH_platform_spin_thread(void (*fn)(void *), void *arg)
+typedef struct
 {
+    MOJOCRASH_thread_entry fn;
+    void *arg;
+    volatile int done;
+} thread_data;
+
+static void *thread_bridge(void *_arg)
+{
+    thread_data *data = (thread_data *) _arg;
+    MOJOCRASH_thread_entry fn = data->fn;
+    void *arg = data->arg;
+    data->done = 1;
+    fn(arg);
+    return NULL;
+} /* thread_bridge */
+
+int MOJOCRASH_platform_spin_thread(MOJOCRASH_thread_entry fn, void *arg)
+{
+    thread_data data = { fn, arg, 0 };
     pthread_t thread;
-    if (pthread_create(&thread, NULL, (void *(*)(void *))fn, arg) != 0)
+    if (pthread_create(&thread, NULL, thread_bridge, arg) != 0)
         return 0;
     pthread_detach(thread);
+    while (!data.done) { /* spin. */ }
     return 1;
 } /* MOJOCRASH_platform_spin_thread */
 

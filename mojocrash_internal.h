@@ -85,6 +85,8 @@ int MOJOCRASH_unix_init(void);
 void MOJOCRASH_unix_get_logpath(char *buf, size_t buflen, const char *appname);
 void MOJOCRASH_unix_get_osver(char *buf, size_t buflen);
 
+typedef void (*MOJOCRASH_thread_entry)(void *);
+
 /*
  * These are all functions that are platform-specific. Usually they need
  *  unportable system APIs, or they handle things in unique ways, or both.
@@ -115,7 +117,7 @@ void MOJOCRASH_platform_close_socket(void *sock);
 int MOJOCRASH_platform_read_socket(void *sock, char *buf, const int l);
 int MOJOCRASH_platform_write_socket(void *sock, const char *buf, const int l);
 int MOJOCRASH_platform_get_http_proxy(char *buf, const int len);
-int MOJOCRASH_platform_spin_thread(void (*fn)(void *), void *arg);
+int MOJOCRASH_platform_spin_thread(MOJOCRASH_thread_entry fn, void *arg);
 
 #ifdef __cplusplus
 }
