@@ -518,8 +518,32 @@ int MOJOCRASH_platform_get_http_proxy(char *buf, const int buflen)
 } /* MOJOCRASH_platform_get_http_proxy */
 
 
+typedef struct
+{
+    void (*fn)(void *);
+    void *arg;
+    volatile int done;
+} thread_data;
+
+static DWORD WINAPI thread_bridge(LPVOID arg)
+{
+    thread_data *data = (thread_data *) arg;
+    void (*fn)(void *) = data->fn;
+    void *arg = data->arg;
+    data->done = 1;
+    fn(arg);
+    return 0;
+} /* thread_bridge */
+
 int MOJOCRASH_platform_spin_thread(void (*fn)(void *), void *arg)
 {
+    thread_data data = { fn, arg, 0 };
+    HANDLE h = CreateThread(NULL, 0, thread_bridge, &data);
+    if (h == NULL)
+        return 0;
+    CloseHandle(h);
+    while (!data.done) { /* spin. */ }
+    return 1;
 } /* MOJOCRASH_platform_spin_thread */
 
 #endif  /* MOJOCRASH_PLATFORM_WINDOWS */
