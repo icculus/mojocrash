@@ -276,10 +276,7 @@ static void send_all_reports_worker_internal(SendReportData *data)
     } /* for */
 
     if (data->bytesin == 0)  /* nothing to do? */
-    {
-        data->done = 1;
         return;
-    } /* if */
 
     for (i = 0; (i < data->total) && (!data->done); i++)
     {
