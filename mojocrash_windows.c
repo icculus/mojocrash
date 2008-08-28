@@ -5,6 +5,7 @@
 
 #define WIN32_LEAN_AND_MEAN 1
 #include <windows.h>
+#include <winsock.h>
 
 #include "mojocrash_internal.h"
 
@@ -201,6 +202,20 @@ void MOJOCRASH_platform_delete_report(const char *appname, const int idx)
 void MOJOCRASH_platform_free_reports(const char **reports, const int total)
 {
 } /* MOJOCRASH_platform_free_reports */
+
+
+int MOJOCRASH_platform_init_network(void)
+{
+    WSADATA data;
+    if (WSAStartup(MAKEWORD(1, 1), &data) != 0)
+        return 0;
+} /* MOJOCRASH_platform_init_network */
+
+
+void MOJOCRASH_platform_deinit_network(void)
+{
+    WSACleanup();
+} /* MOJOCRASH_platform_deinit_network */
 
 
 void *MOJOCRASH_platform_begin_dns(const char *host, const int port, const int blocking)

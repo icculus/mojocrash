@@ -278,6 +278,12 @@ static void send_all_reports_worker_internal(SendReportData *data)
     if (data->bytesin == 0)  /* nothing to do? */
         return;
 
+    if (!MOJOCRASH_platform_init_network())
+    {
+        set_send_status(data, "Network init failed", 100, -1);
+        return;
+    } /* if */
+
     for (i = 0; (i < data->total) && (!data->done); i++)
     {
         char numcvt[32];
@@ -433,6 +439,8 @@ static void send_all_reports_worker_internal(SendReportData *data)
 
     if (data->resolved)
         MOJOCRASH_platform_free_dns(data->resolved);
+
+    MOJOCRASH_platform_deinit_network();
 } /* send_all_reports_worker_internal */
 
 

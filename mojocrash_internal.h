@@ -104,6 +104,8 @@ long MOJOCRASH_platform_now(void);
 const char **MOJOCRASH_platform_load_reports(const char *appname, int *total);
 void MOJOCRASH_platform_delete_report(const char *appname, const int idx);
 void MOJOCRASH_platform_free_reports(const char **reports, const int total);
+int MOJOCRASH_platform_init_network(void);
+void MOJOCRASH_platform_deinit_network(void);
 void *MOJOCRASH_platform_begin_dns(const char *host, const int port, const int blocking);
 int MOJOCRASH_platform_check_dns(void *dns);
 void MOJOCRASH_platform_free_dns(void *dns);

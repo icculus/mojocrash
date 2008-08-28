@@ -303,6 +303,10 @@ int MOJOCRASH_platform_spin_thread(void (*fn)(void *), void *arg)
 } /* MOJOCRASH_platform_spin_thread */
 
 
+int MOJOCRASH_platform_init_network(void) { /* no-op. */ return 1; }
+void MOJOCRASH_platform_deinit_network(void) { /* no-op. */ }
+
+
 typedef struct DnsResolve
 {
     char *host;
