@@ -218,43 +218,243 @@ void MOJOCRASH_platform_deinit_network(void)
 } /* MOJOCRASH_platform_deinit_network */
 
 
-void *MOJOCRASH_platform_begin_dns(const char *host, const int port, const int blocking)
+typedef struct DnsResolve
 {
+    int in_use;
+    char host[MAX_PATH];
+    int port;
+    CRITICAL_SECTION mutex;
+    struct addrinfo *addr;
+    struct hostent *hent;
+    volatile int status;
+    volatile int app_done;
+} DnsResolve;
+
+
+static void free_dns(DnsResolve *dns)
+{
+    pDeleteCriticalSection(&dns->mutex);
+    if (dns->addr != NULL)
+        pfreeaddrinfo(dns->addr);
+    dns->in_use = 0;
+    /* this is a static struct at the moment, don't free it. */
+} /* free_dns */
+
+
+static void dns_resolver_thread(void *_dns)
+{
+    int app_done = 0;
+    DnsResolve *dns = (DnsResolve *) _dns;
+    int rc = -1;
+
+    /* gethostbyname and getaddrinfo block, hence all the thread tapdancing. */
+    if (pgetaddrinfo != NULL)
+    {
+        char portstr[64];
+        MOJOCRASH_LongToString(dns->port, portstr);
+        rc = pgetaddrinfo(dns->host, portstr, NULL, &dns->addr);
+    } /* if */
+
+    else  /* pre-XP systems use this. */
+    {
+        if (pinet_addr(dns->host) != INADDR_NONE)  /* a ip addr string? */
+            dns->hent = pgethostbyaddr(dns->host, 4, AF_INET);
+        else
+            dns->hent = pgethostbyname(dns->host);
+        rc = (dns->hent == NULL) ? -1 : 0;
+    } /* else */
+
+    pEnterCriticalSection(&dns->mutex);
+    dns->status = (rc == 0) ? 1 : -1;
+    app_done = dns->app_done;
+    pLeaveCriticalSection(&dns->mutex);
+
+    /* we free if the app is done, otherwise, app will do it. */
+    if (app_done)
+        free_dns(dns);
+} /* dns_resolver_thread */
+
+
+void *MOJOCRASH_platform_begin_dns(const char *host, const int port,
+                                   const int blocking)
+{
+    /* just made this static to avoid malloc() call. */
+    static DnsResolve retval;
+    int mutex_initted = 0;
+
+    if ( (strlen(host) + 1) >= sizeof (retval.host) )
+        return NULL;
+    else if (retval.in_use)
+        return NULL;
+
+    pInitializeCriticalSection(&retval->mutex);
+    mutex_initted = 1;
+    strcpy(retval->host, host);
+    retval->port = port;
+    retval->addr = NULL;
+    retval->hent = NULL;
+    retval->status = 0;
+    retval->app_done = 0;
+    retval->in_use = 1;
+
+    if (blocking)
+        dns_resolver_thread(retval);
+    else
+    {
+        if (!MOJOCRASH_platform_spin_thread(dns_resolver_thread, retval))
+            goto begin_dns_failed;
+    } /* else */
+
+    return &retval;
+
+begin_dns_failed:
+    if (mutex_initted)
+        pDeleteCriticalSection(&retval->mutex);
+    return NULL;
 } /* MOJOCRASH_platform_begin_dns */
 
 
-int MOJOCRASH_platform_check_dns(void *dns)
+int MOJOCRASH_platform_check_dns(void *_dns)
 {
+    DnsResolve *dns = (DnsResolve *) _dns;
+    int retval;
+    if (dns == NULL)
+        return -1;
+    pEnterCriticalSection(&dns->mutex);
+    retval = dns->status;
+    pLeaveCriticalSection(&dns->mutex);
+    return retval;
 } /* MOJOCRASH_platform_check_dns */
 
 
-void MOJOCRASH_platform_free_dns(void *dns)
+void MOJOCRASH_platform_free_dns(void *_dns)
 {
+    int thread_done = 0;
+    DnsResolve *dns = (DnsResolve *) _dns;
+    if (dns == NULL)
+        return;
+
+    pEnterCriticalSection(&dns->mutex);
+    dns->app_done = 1;
+    thread_done = (dns->status != 0);
+    pLeaveCriticalSection(&dns->mutex);
+
+    /* we free if the thread is done, otherwise, thread will do it. */
+    if (thread_done)
+        free_dns(dns);
 } /* MOJOCRASH_platform_free_dns */
 
 
-void *MOJOCRASH_platform_open_socket(void *dns, const int blocking)
+void *MOJOCRASH_platform_open_socket(void *_dns, const int blocking)
 {
+    DnsResolve *dns = (DnsResolve *) _dns;
+    SOCKET fd = INVALID_SOCKET_HANDLE;
+    DWORD one = 1;
+    int success = 0;
+
+    if (MOJOCRASH_platform_check_dns(dns) != 1)
+        return NULL;  /* dns resolve isn't done or it failed. */
+
+    if (dns->addr != NULL)
+    {
+        const struct addrinfo *addr;
+        for (addr = dns->addr; addr != NULL; addr = addr->ai_next)
+        {
+            if (addr->ai_socktype != SOCK_STREAM)
+                continue;
+
+            if (fd != INVALID_SOCKET_HANDLE)
+                pclosesocket(fd);
+
+            fd = psocket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+            if (fd == INVALID_SOCKET_HANDLE)
+                continue;
+
+            if (!blocking)
+            {
+                if (pioctlsocket(fd, FIONBIO, &one) != 0)
+                    continue;
+            } /* if */
+
+            if (pconnect(fd, addr->ai_addr, addr->ai_addrlen) != 0)
+            {
+                if (pWSAGetLastError() != WSAEWOULDBLOCK)
+                    continue;
+            } /* if */
+
+            success = 1;
+            break;
+        } /* for */
+    } /* if */
+
+    else if (dns->hent != NULL)  /* pre-XP systems. */
+    {
+        const struct hostent *hent = dns->hent;
+        fd = psocket(hent->h_addrtype, SOCK_STREAM, IPPROTO_TCP);
+        if (fd != INVALID_SOCKET_HANDLE)
+        {
+            if ((blocking) || (pioctlsocket(fd, FIONBIO, &one) == 0))
+            {
+                if (pconnect(fd, hent->h_addr_list[0], hent->h_length) == 0)
+                    success = 1;
+                else if (pWSAGetLastError() == WSAEWOULDBLOCK)
+                    success = 1;
+            } /* if */
+        } /* if */
+    } /* else if */
+
+    if (!success)
+    {
+        if (fd != INVALID_SOCKET_HANDLE)
+            pclosesocket(fd);
+        return NULL;
+    } /* if */
+
+    return ((void *) retval);
 } /* MOJOCRASH_platform_open_socket */
 
 
 int MOJOCRASH_platform_check_socket(void *sock)
 {
+    const SOCKET fd = ((SOCKET) sock);
+    fd_set wfds;
+    struct timeval tv;
+    int retval;
+
+    /* one handle, no wait. */
+    FD_ZERO(&wfds);
+    FD_SET(fd, &wfds);
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+
+    retval = pselect(fd+1, NULL, &wfds, NULL, &tv);
+    return ((retval > 0) && (FD_ISSET(fd, &wfds) != 0));
 } /* MOJOCRASH_platform_check_socket */
 
 
 void MOJOCRASH_platform_close_socket(void *sock)
 {
+    pclosesocket((SOCKET) sock);
 } /* MOJOCRASH_platform_close_socket */
 
 
 int MOJOCRASH_platform_read_socket(void *sock, char *buf, const int l)
 {
+    const SOCKET fd = ((SOCKET) sock);
+    const int retval = (int) precv(fd, buf, l, 0);
+    if (retval < 0)
+        return (pWSAGetLastError() == WSAEWOULDBLOCK) ? -2 : -1;
+    return retval;
 } /* MOJOCRASH_platform_read_socket */
 
 
 int MOJOCRASH_platform_write_socket(void *sock, const char *buf, const int l)
 {
+    const SOCKET fd = ((SOCKET) sock);
+    const int retval = (int) psend(fd, buf, l, 0);
+    if (retval < 0)
+        return (pWSAGetLastError() == WSAEWOULDBLOCK) ? -2 : -1;
+    return retval;
 } /* MOJOCRASH_platform_write_socket */
 
 
