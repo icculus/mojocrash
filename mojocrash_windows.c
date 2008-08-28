@@ -51,7 +51,6 @@ int MOJOCRASH_platform_init(void)
     return 1;
 } /* MOJOCRASH_platform_init */
 
-
 static MOJOCRASH_catcher crash_catcher = NULL;
 static LONG WINAPI windows_crash_catcher_bridge(LPEXCEPTION_POINTERS excpt)
 {
@@ -67,8 +66,72 @@ int MOJOCRASH_platform_install_crash_catcher(MOJOCRASH_catcher catcher)
 } /* MOJOCRASH_platform_install_crash_catcher */
 
 
+/*
+ * This will read memory if it's safe to, and reports an error instead of
+ *  segfaulting otherwise. We hope.
+ */
+static inline int safe_read_ptr(const uintptr_t src, uintptr_t *dst)
+{
+    if (IsBadReadPtr((void *) src, sizeof (void *)))
+        return 0;
+    *dst = *((uintptr_t *) src);
+} /* safe_read_ptr */
+
+
+static int walk_windows_stack(int skip, MOJOCRASH_get_callstack_callback cb)
+{
+    /* offset of caller's address in linkage area, from base of stack frame. */
+    const uintptr_t linkage_offset = sizeof (uintptr_t);  /* one pointer. */
+    uintptr_t fp = 0;  /* frame pointer. */
+    uintptr_t pc = 0;  /* program counter. */
+    uintptr_t lower_bound = 0;
+
+    fp = (uintptr_t) __builtin_frame_address(1);
+    pc = (uintptr_t) __builtin_return_address(0);
+
+#ifdef _MSC_VER
+__try {
+#endif
+
+    while (1)  /* go until we fail. */
+    {
+        uintptr_t nextFrame, nextPC, dummy;
+
+        if (!safe_read_ptr(pc, &dummy))
+            break;  /* can't read? Bogus program counter. Give up. */
+
+        if (skip > 0)
+            skip--;
+        else if (!cb((void *) pc))
+            return 0;  /* stop here. */
+
+        if ((fp == 0) || (fp & (sizeof (uintptr_t)-1)) || (fp <= lower_bound))
+            break;  /* Bogus frame pointer. Give up. */
+
+        /* get the next stack frame (zero bytes into current stack frame). */
+        if (!safe_read_ptr(fp, &nextFrame))
+            break;  /* Can't read? Bogus frame pointer. Give up. */
+
+        /* get the stored Linkage Area value. */
+        if (!safe_read_ptr(nextFrame + linkage_offset, &nextPC))
+            break;  /* Can't read? Bogus frame pointer. Give up. */
+
+        lower_bound = fp;
+        pc = nextPC;
+        fp = nextFrame;
+    } /* while */
+
+#ifdef _MSC_VER
+} __except(EXCEPTION_EXECUTE_HANDLER) { /* no-op. */ }
+#endif
+
+    return 1;
+} /* walk_windows_stack */
+
+
 int MOJOCRASH_platform_get_callstack(MOJOCRASH_get_callstack_callback cb)
 {
+    return walk_windows_stack(0, cb);
 } /* MOJOCRASH_platform_get_callstack */
 
 
