@@ -64,7 +64,7 @@ static inline int safe_read_ptr(const uintptr_t src, uintptr_t *dst)
 } /* safe_read_ptr */
 
 
-static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
+static int walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
 {
     /* offset of caller's address in linkage area, from base of stack frame. */
     #if MOJOCRASH_PLATFORM_POWERPC || MOJOCRASH_PLATFORM_POWERPC_64
@@ -100,7 +100,7 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
         if (skip > 0)
             skip--;
         else if (!cb((void *) pc))
-            break;  /* stop here. */
+            return 0;  /* stop here. */
 
         /*
          * !!! FIXME: ABI guides for all 4 CPUs say the frame pointer should
@@ -124,6 +124,8 @@ static void walk_macosx_stack(int skip, MOJOCRASH_get_callstack_callback cb)
         pc = nextPC;
         fp = nextFrame;
     } /* while */
+
+    return 1;
 } /* walk_macosx_stack */
 
 
@@ -134,7 +136,7 @@ int MOJOCRASH_platform_get_callstack(MOJOCRASH_get_callstack_callback cb)
 
     /* Prior to Mac OS X 10.5, we have to walk the stack ourselves.  :/  */
     if (libc_backtrace == NULL)
-        walk_macosx_stack(skip_frames, cb);
+        return walk_macosx_stack(skip_frames, cb);
     else
     {
         /* If we're on 10.5 or later, just use the system facilities. */
