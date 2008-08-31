@@ -314,6 +314,22 @@ static void dns_resolver_thread(void *_dns)
     if (pgetaddrinfo != NULL)
     {
         char portstr[64];
+        struct addrinfo hints;
+
+        #ifndef AI_ADDRCONFIG
+        #define AI_ADDRCONFIG 0
+        #endif
+        #ifndef AI_NUMERICSERV
+        #define AI_NUMERICSERV 0
+        #endif
+        #ifndef AI_V4MAPPED
+        #define AI_V4MAPPED 0
+        #endif
+        ZeroMemory(&hints, sizeof (hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = AI_NUMERICSERV | AI_V4MAPPED | AI_ADDRCONFIG;
+
         MOJOCRASH_LongToString(dns->port, portstr);
         rc = pgetaddrinfo(dns->host, portstr, NULL, &dns->addr);
     } /* if */
@@ -423,9 +439,6 @@ void *MOJOCRASH_platform_open_socket(void *_dns, const int blocking)
         const struct addrinfo *addr;
         for (addr = dns->addr; addr != NULL; addr = addr->ai_next)
         {
-            if (addr->ai_socktype != SOCK_STREAM)
-                continue;
-
             if (fd != INVALID_SOCKET_HANDLE)
                 pclosesocket(fd);
 

@@ -351,13 +351,28 @@ static void dns_resolver_thread(void *_dns)
 {
     char portstr[64];
     int app_done = 0;
+    struct addrinfo hints;
     DnsResolve *dns = (DnsResolve *) _dns;
-    int rc;
+    int rc = -1;
+
+    #ifndef AI_ADDRCONFIG
+    #define AI_ADDRCONFIG 0
+    #endif
+    #ifndef AI_NUMERICSERV
+    #define AI_NUMERICSERV 0
+    #endif
+    #ifndef AI_V4MAPPED
+    #define AI_V4MAPPED 0
+    #endif
+    memset(&hints, '\0', sizeof (hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_NUMERICSERV | AI_V4MAPPED | AI_ADDRCONFIG;
 
     MOJOCRASH_LongToString(dns->port, portstr);
 
     /* this blocks, hence all the thread tapdancing. */
-    rc = getaddrinfo(dns->host, portstr, NULL, &dns->addr);
+    rc = getaddrinfo(dns->host, portstr, &hints, &dns->addr);
 
     pthread_mutex_lock(&dns->mutex);
     dns->status = (rc == 0) ? 1 : -1;
@@ -465,9 +480,6 @@ void *MOJOCRASH_platform_open_socket(void *_dns, const int blocking)
 
     for (addr = dns->addr; addr != NULL; addr = addr->ai_next)
     {
-        if (addr->ai_socktype != SOCK_STREAM)
-            continue;
-
         if (fd != -1)
             close(fd);
 
