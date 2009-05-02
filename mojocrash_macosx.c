@@ -35,7 +35,7 @@ static long macver_major, macver_minor, macver_patch;
  *  now. The MoreIsBetter license allows this sort of thievery.
  *
  * The ABI Function Call Guide was helpful, for moving this from 32-bit PPC
- *  two four total CPU architectures:
+ *  to four total CPU architectures:
  *
  *  http://developer.apple.com/documentation/DeveloperTools/Conceptual/LowLevelABI/Introduction.html
  */
