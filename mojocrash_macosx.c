@@ -27,7 +27,7 @@ typedef struct segment_command SegmentCommand;
 #error There seems to be a problem.
 #endif
 
-static long macver_major, macver_minor, macver_patch;
+static SInt32 macver_major, macver_minor, macver_patch;
 
 /*
  * The stackwalking code was, a lifetime ago, based on MoreBacktrace.c from
@@ -205,7 +205,7 @@ int MOJOCRASH_platform_get_objects(MOJOCRASH_get_objects_callback cb)
 static void lookup_version(void)
 {
     static int looked_up = 0;
-    long ver = 0;
+    SInt32 ver = 0;
 
     if (looked_up)
         return;
@@ -261,8 +261,8 @@ void MOJOCRASH_unix_get_osver(char *buf, const size_t buflen)
         snprintf(buf, buflen, "???");
     else
     {
-        snprintf(buf, buflen, "%ld.%ld.%ld",
-                 macver_major, macver_minor, macver_patch);
+        snprintf(buf, buflen, "%d.%d.%d",
+                 (int) macver_major, (int) macver_minor, (int) macver_patch);
     } /* else */
 } /* MOJOCRASH_unix_get_osver */
 
