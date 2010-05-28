@@ -368,17 +368,20 @@ int MOJOCRASH_unix_init(void)
 
     #define XX 0  /* just to show it's unsupported. */
     static const struct { uintptr_t offset; uintptr_t len; } sigtramps[] = {
-        /* 10.0, 10.1, 10.2, 10.3, 10.4, 10.5 */
+        /* 10.0, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6 */
+        /* PowerPC and PowerPC64 hit end-of-life with 10.5 */
+        /* x86 started with 10.4 (x86_64 isn't really usable before 10.6) */
         #if MOJOCRASH_PLATFORM_POWERPC
         {XX,XX}, {0x7C,0}, {0xA4,0}, {0,0},   {0xFC,0x248}, {0x9C,0x50},
         #elif MOJOCRASH_PLATFORM_POWERPC_64
         {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0x27C},    {0xB8,0x50},
         #elif MOJOCRASH_PLATFORM_X86
-        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0},        {0x80,0x44},
+        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0},        {0x80,0x44}, {0x80,0x44},
         #elif MOJOCRASH_PLATFORM_X86_64
-        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0},        {0,0x30},
+        /* Offset 0 seems to work. x86_64 actually sets up a frame pointer? */
+        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {XX,XX},      {0,0x30},    {0,0x30},
         #else
-        {XX,XX}, {XX,XX},  {XX,XX},  {XX,XX}, {0,0},        {0,0},
+        #error Please define your platform.
         #endif
     };
     #undef XX
