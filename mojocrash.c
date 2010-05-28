@@ -142,7 +142,7 @@ long MOJOCRASH_StringToLong(const char *str)
         if ((ch < '0') || (ch > '9'))
             break;
         i++;
-    } /* for */
+    } /* while */
 
     while (--i >= 0)
     {
