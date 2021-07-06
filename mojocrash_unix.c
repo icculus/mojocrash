@@ -197,7 +197,7 @@ const char **MOJOCRASH_platform_load_reports(const char *appname, int *total)
 
     while ((dent = readdir(dirp)) != NULL)
     {
-        char path[PATH_MAX+1];
+        char path[PATH_MAX+16];
         const char *name = dent->d_name;
         char *data = NULL;
         char **ptr = NULL;
