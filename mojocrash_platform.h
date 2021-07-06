@@ -9,15 +9,15 @@
 #define MOJOCRASH_PLATFORM_NAME "macosx"
 #define MOJOCRASH_PLATFORM_MACOSX 1
 #define MOJOCRASH_PLATFORM_UNIX 1
-#elif __BEOS__
-#define MOJOCRASH_PLATFORM_NAME "beos"
+#elif defined(__HAIKU__)
+#define MOJOCRASH_PLATFORM_NAME "haiku"
 #define MOJOCRASH_PLATFORM_BEOS 1
 #define MOJOCRASH_PLATFORM_UNIX 1
-#elif __linux__
+#elif defined(__linux__)
 #define MOJOCRASH_PLATFORM_NAME "linux"
 #define MOJOCRASH_PLATFORM_LINUX 1
 #define MOJOCRASH_PLATFORM_UNIX 1
-#elif WINDOWS
+#elif defined(_WIN32) || defined(_WIN64)
 #define MOJOCRASH_PLATFORM_NAME "windows"
 #define MOJOCRASH_PLATFORM_WINDOWS 1
 #else
