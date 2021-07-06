@@ -1,20 +1,20 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.4)
-PROJECT(MojoCrash)
+cmake_minimum_required(VERSION 3.0.0)
+project(MojoCrash)
 
-IF(CMAKE_COMPILER_IS_GNUCC)
-    ADD_DEFINITIONS(-Wall -ggdb3)
-ENDIF(CMAKE_COMPILER_IS_GNUCC)
+if(CMAKE_COMPILER_IS_GNUCC)
+    add_definitions(-Wall -ggdb3)
+endif()
 
-IF(MSVC)
-    ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS=1)
-ENDIF(MSVC)
+if(MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS=1)
+endif()
 
-IF(APPLE)
-    SET(OPTIONAL_LIBS ${OPTIONAL_LIBS} "-framework Carbon -framework SystemConfiguration")
-ELSE(APPLE)
-    FIND_PACKAGE(Threads)
+if(APPLE)
+    set(OPTIONAL_LIBS ${OPTIONAL_LIBS} "-framework Carbon -framework SystemConfiguration")
+else()
+    find_package(Threads)
     SET(OPTIONAL_LIBS ${OPTIONAL_LIBS} ${CMAKE_THREAD_LIBS_INIT})
-ENDIF(APPLE)
+endif()
 
 SET(MOJOCRASH_SRCS
     mojocrash.c
@@ -25,8 +25,8 @@ SET(MOJOCRASH_SRCS
     mojocrash_windows.c
 )
 
-ADD_EXECUTABLE(test test.c ${MOJOCRASH_SRCS})
-TARGET_LINK_LIBRARIES(test ${OPTIONAL_LIBS})
+add_executable(test test.c ${MOJOCRASH_SRCS})
+target_link_libraries(test ${OPTIONAL_LIBS})
 
 # End of CMakeLists.txt ...
 
