@@ -8,9 +8,9 @@ jobs:
     runs-on: ${{ matrix.platform.os }}
     strategy:
       matrix:
-        platform:  # !!! FIXME: figure out an efficient way to get SDL2 on the Windows/Mac bots.
+        platform:
         - { name: Linux,   os: ubuntu-20.04, flags: -GNinja }
-        - { name: Windows, os: windows-latest }
+        #- { name: Windows, os: windows-latest }
         - { name: MacOS,   os: macos-latest }
     steps:
     - name: Setup Linux dependencies
